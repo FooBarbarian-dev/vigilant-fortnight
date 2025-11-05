@@ -1,0 +1,45 @@
+[package]
+name = "rig-patterns"
+version = "0.1.0"
+edition = "2021"
+authors = ["rig-patterns contributors"]
+description = "Dead-simple orchestration pattern abstractions over rig-core LLM framework"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/FooBarbarian-dev/vigilant-fortnight"
+keywords = ["llm", "ai", "orchestration", "agents", "rig"]
+categories = ["api-bindings", "asynchronous"]
+
+[dependencies]
+rig-core = "0.4"
+tokio = { version = "1", features = ["full"] }
+async-trait = "0.1"
+anyhow = "1.0"
+futures = "0.3"
+serde = { version = "1.0", features = ["derive"], optional = true }
+serde_yaml = { version = "0.9", optional = true }
+tracing = "0.1"
+
+[dev-dependencies]
+tokio-test = "0.4"
+tracing-subscriber = "0.3"
+
+[features]
+default = []
+yaml = ["serde", "serde_yaml"]
+
+[[example]]
+name = "basic_usage"
+path = "examples/basic_usage.rs"
+
+[[example]]
+name = "yaml_config"
+path = "examples/yaml_config.rs"
+required-features = ["yaml"]
+
+[[example]]
+name = "pattern_comparison"
+path = "examples/pattern_comparison.rs"
+
+[[example]]
+name = "custom_agents"
+path = "examples/custom_agents.rs"

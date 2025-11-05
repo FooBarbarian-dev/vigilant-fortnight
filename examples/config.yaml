@@ -1,0 +1,57 @@
+# Example configuration for rig-patterns
+#
+# This file demonstrates how to configure an orchestrator using YAML.
+# You can switch between patterns by changing the 'orchestration' section.
+
+agents:
+  - id: summarizer
+    provider: openai
+    model: gpt-4
+    system_prompt: "You are a helpful assistant that summarizes text concisely and accurately."
+
+  - id: critic
+    provider: openai
+    model: gpt-4
+    system_prompt: "You are a constructive critic who provides thoughtful feedback on summaries."
+
+  - id: refiner
+    provider: openai
+    model: gpt-4
+    system_prompt: "You take feedback and create improved, refined versions."
+
+# Orchestration pattern configuration
+# Uncomment one of the patterns below to use it
+
+# Pattern 1: Sequential (default)
+orchestration:
+  type: sequential
+
+# Pattern 2: Concurrent with Vote aggregation
+# orchestration:
+#   type: concurrent
+#   aggregation: vote
+
+# Pattern 3: Concurrent with Consensus aggregation
+# orchestration:
+#   type: concurrent
+#   aggregation: consensus
+
+# Pattern 4: Concurrent with Combine aggregation
+# orchestration:
+#   type: concurrent
+#   aggregation: combine
+
+# Pattern 5: Group Chat
+# orchestration:
+#   type: group_chat
+#   max_rounds: 5
+
+# Pattern 6: Handoff
+# orchestration:
+#   type: handoff
+#   max_hops: 10
+
+# Pattern 7: Magentic (requires at least 2 agents: manager + workers)
+# orchestration:
+#   type: magentic
+#   max_iterations: 10
