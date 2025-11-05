@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>rig-patterns Interactive Demo</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <h1>🎭 rig-patterns Interactive Demo</h1>
+            <p class="tagline">Switch orchestration patterns with a single click</p>
+        </header>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Left Sidebar: Agent Configuration -->
+            <aside class="agent-panel">
+                <div class="panel-header">
+                    <h3>Agents</h3>
+                    <button id="add-agent" class="btn btn-primary">+ Add Agent</button>
+                </div>
+
+                <div id="agents-container">
+                    <!-- Agent cards will be added here dynamically -->
+                </div>
+
+                <div class="presets-section">
+                    <label for="load-preset">Load Preset:</label>
+                    <select id="load-preset" class="select-input">
+                        <option value="">-- Select Example --</option>
+                    </select>
+                </div>
+            </aside>
+
+            <!-- Center: Execution Area -->
+            <main class="execution-area">
+                <!-- Pattern Selection -->
+                <div class="pattern-selector">
+                    <h3>Pattern Configuration</h3>
+                    <div class="pattern-controls">
+                        <label for="pattern-type">Pattern:</label>
+                        <select id="pattern-type" class="select-input">
+                            <option value="sequential">Sequential (→→→)</option>
+                            <option value="concurrent">Concurrent (⇉)</option>
+                            <option value="group_chat">Group Chat (💬)</option>
+                            <option value="handoff">Handoff (↷)</option>
+                            <option value="magentic">Magentic (☰)</option>
+                        </select>
+
+                        <!-- Pattern-specific options -->
+                        <div id="pattern-options" class="pattern-options">
+                            <!-- Dynamic options will be inserted here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Input Area -->
+                <div class="input-section">
+                    <label for="user-input">Input Prompt:</label>
+                    <textarea
+                        id="user-input"
+                        placeholder="Enter your prompt here... (e.g., 'Analyze the pros and cons of microservices')"
+                        rows="4"
+                    ></textarea>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="action-buttons">
+                    <button id="execute" class="btn btn-primary btn-large">
+                        ▶️ Execute Pattern
+                    </button>
+                    <button id="execute-stream" class="btn btn-secondary btn-large">
+                        📡 Execute with Streaming
+                    </button>
+                    <button id="compare-all" class="btn btn-accent btn-large">
+                        🔀 Compare All Patterns
+                    </button>
+                </div>
+
+                <!-- Real-Time Visualization Panel -->
+                <div id="visualization" class="visualization-panel">
+                    <h3>Real-Time Execution</h3>
+                    <div id="viz-content" class="viz-content">
+                        <p class="viz-placeholder">Click "Execute" to start visualization</p>
+                    </div>
+                </div>
+
+                <!-- Results Display -->
+                <div id="results-container" class="results-section" style="display: none;">
+                    <h3>Results</h3>
+                    <div id="results-content">
+                        <!-- Results will be dynamically inserted -->
+                    </div>
+                </div>
+
+                <!-- Comparison Grid (shown when comparing all patterns) -->
+                <div id="comparison-grid" class="comparison-grid" style="display: none;">
+                    <!-- Comparison columns will be dynamically inserted -->
+                </div>
+            </main>
+        </div>
+
+        <!-- Footer -->
+        <footer class="app-footer">
+            <p>
+                Built with <a href="https://github.com/FooBarbarian-dev/vigilant-fortnight" target="_blank">rig-patterns</a>
+                | Switch patterns by changing one line of code
+            </p>
+        </footer>
+    </div>
+
+    <!-- Agent Card Template -->
+    <template id="agent-card-template">
+        <div class="agent-card">
+            <div class="agent-card-header">
+                <input type="text" class="agent-id" placeholder="Agent ID" value="agent-1">
+                <button class="remove-agent" title="Remove agent">×</button>
+            </div>
+            <select class="agent-provider" title="LLM Provider">
+                <option value="openai">OpenAI</option>
+                <option value="anthropic">Anthropic</option>
+                <option value="cohere">Cohere</option>
+            </select>
+            <input type="text" class="agent-model" placeholder="Model (e.g., gpt-4)" value="gpt-4">
+            <textarea
+                class="agent-prompt"
+                placeholder="System prompt defining agent's role"
+                rows="2"
+            >You are a helpful assistant.</textarea>
+        </div>
+    </template>
+
+    <!-- Loading Spinner Template -->
+    <template id="loading-spinner">
+        <div class="loading-spinner">
+            <div class="spinner"></div>
+            <p>Executing pattern...</p>
+        </div>
+    </template>
+
+    <script src="/app.js"></script>
+</body>
+</html>
