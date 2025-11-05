@@ -43,3 +43,7 @@ path = "examples/pattern_comparison.rs"
 [[example]]
 name = "custom_agents"
 path = "examples/custom_agents.rs"
+
+[[example]]
+name = "real_llm_integration"
+path = "examples/real_llm_integration.rs"

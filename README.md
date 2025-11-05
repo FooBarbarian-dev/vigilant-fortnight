@@ -87,6 +87,153 @@ async fn main() -> anyhow::Result<()> {
 }
 ```
 
+## Connecting to LLM Providers
+
+`rig-patterns` supports all major LLM providers through convenient helper methods. You can mix and match providers in the same orchestration!
+
+### Supported Providers
+
+| Provider | Models | API Key Env Var | Get API Key |
+|----------|--------|-----------------|-------------|
+| **OpenAI** | gpt-4, gpt-4-turbo-preview, gpt-3.5-turbo | `OPENAI_API_KEY` | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) |
+| **Anthropic** | claude-3-opus, claude-3-sonnet, claude-3-haiku | `ANTHROPIC_API_KEY` | [console.anthropic.com](https://console.anthropic.com/) |
+| **Cohere** | command, command-light, command-nightly | `COHERE_API_KEY` | [dashboard.cohere.com/api-keys](https://dashboard.cohere.com/api-keys) |
+
+### Setup API Keys
+
+1. **Copy the example environment file:**
+   ```bash
+   cp .env.example .env
+   ```
+
+2. **Add your API keys to `.env`:**
+   ```bash
+   OPENAI_API_KEY=sk-...
+   ANTHROPIC_API_KEY=sk-ant-...
+   COHERE_API_KEY=...
+   ```
+
+3. **Load environment variables:**
+   ```rust
+   // In your code, or use a crate like `dotenv`
+   dotenv::dotenv().ok();
+   ```
+
+### Creating Agents from Providers
+
+#### Method 1: Direct API Key
+
+```rust
+use rig_patterns::Agent;
+
+// OpenAI
+let agent = Agent::from_openai(
+    "writer",
+    "sk-...",  // Your API key
+    "gpt-4",
+    "You are a helpful writer"
+)?;
+
+// Anthropic
+let agent = Agent::from_anthropic(
+    "analyst",
+    "sk-ant-...",
+    "claude-3-opus-20240229",
+    "You are a thorough analyst"
+)?;
+
+// Cohere
+let agent = Agent::from_cohere(
+    "summarizer",
+    "...",
+    "command",
+    "You create concise summaries"
+)?;
+```
+
+#### Method 2: From Environment Variables (Recommended)
+
+```rust
+use rig_patterns::Agent;
+
+// Reads from OPENAI_API_KEY environment variable
+let agent = Agent::from_env(
+    "writer",
+    "openai",
+    "gpt-4",
+    "You are a helpful writer"
+)?;
+
+// Reads from ANTHROPIC_API_KEY
+let agent = Agent::from_env(
+    "analyst",
+    "anthropic",
+    "claude-3-sonnet-20240229",
+    "You analyze thoroughly"
+)?;
+```
+
+### Multi-Provider Example
+
+Mix providers in the same orchestration:
+
+```rust
+use rig_patterns::{Agent, Orchestrator, Pattern, Aggregation};
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    // Create agents from different providers
+    let agents = vec![
+        Agent::from_env("gpt4-analyst", "openai", "gpt-4", "You analyze code")?,
+        Agent::from_env("claude-writer", "anthropic", "claude-3-sonnet-20240229", "You write docs")?,
+        Agent::from_env("cohere-reviewer", "cohere", "command", "You review content")?,
+    ];
+
+    // Run concurrent execution with different models!
+    let result = Orchestrator::new(agents)
+        .pattern(Pattern::Concurrent {
+            aggregation: Aggregation::Combine
+        })
+        .build()?
+        .execute("Analyze this code and document it")
+        .await?;
+
+    println!("{}", result.output);
+    Ok(())
+}
+```
+
+### Model Recommendations
+
+**For Speed & Cost:**
+- OpenAI: `gpt-3.5-turbo`
+- Anthropic: `claude-3-haiku-20240307`
+- Cohere: `command-light`
+
+**For Quality:**
+- OpenAI: `gpt-4`
+- Anthropic: `claude-3-opus-20240229`
+- Cohere: `command`
+
+**Balanced:**
+- OpenAI: `gpt-4-turbo-preview`
+- Anthropic: `claude-3-sonnet-20240229`
+- Cohere: `command`
+
+### Complete Integration Example
+
+See [`examples/real_llm_integration.rs`](examples/real_llm_integration.rs) for a comprehensive example showing:
+- Single provider setup
+- Multi-provider orchestration
+- Environment variable usage
+- Pattern switching with real LLMs
+
+Run it with:
+```bash
+export OPENAI_API_KEY="sk-..."
+cargo run --example real_llm_integration
+```
+
 ## Available Patterns
 
 ### 1. Sequential

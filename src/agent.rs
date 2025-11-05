@@ -77,6 +77,174 @@ impl Agent {
     pub fn system_prompt(&self) -> &str {
         &self.system_prompt
     }
+
+    /// Create an agent using OpenAI models
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Unique identifier for this agent
+    /// * `api_key` - OpenAI API key
+    /// * `model` - Model name (e.g., "gpt-4", "gpt-4-turbo-preview", "gpt-3.5-turbo")
+    /// * `system_prompt` - System prompt defining the agent's role
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// use rig_patterns::Agent;
+    ///
+    /// # async fn example() -> anyhow::Result<()> {
+    /// let agent = Agent::from_openai(
+    ///     "summarizer",
+    ///     "sk-...",  // Your OpenAI API key
+    ///     "gpt-4",
+    ///     "You are a helpful summarizer"
+    /// )?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn from_openai(
+        id: &str,
+        api_key: &str,
+        model: &str,
+        system_prompt: &str,
+    ) -> Result<Self> {
+        let client = rig::providers::openai::Client::new(api_key);
+        let completion_model = client.completion_model(model);
+        Ok(Self::new(id, completion_model, system_prompt))
+    }
+
+    /// Create an agent using Anthropic Claude models
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Unique identifier for this agent
+    /// * `api_key` - Anthropic API key
+    /// * `model` - Model name (e.g., "claude-3-opus-20240229", "claude-3-sonnet-20240229", "claude-3-haiku-20240307")
+    /// * `system_prompt` - System prompt defining the agent's role
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// use rig_patterns::Agent;
+    ///
+    /// # async fn example() -> anyhow::Result<()> {
+    /// let agent = Agent::from_anthropic(
+    ///     "analyst",
+    ///     "sk-ant-...",  // Your Anthropic API key
+    ///     "claude-3-opus-20240229",
+    ///     "You are a thorough analyst"
+    /// )?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn from_anthropic(
+        id: &str,
+        api_key: &str,
+        model: &str,
+        system_prompt: &str,
+    ) -> Result<Self> {
+        let client = rig::providers::anthropic::Client::new(api_key);
+        let completion_model = client.completion_model(model);
+        Ok(Self::new(id, completion_model, system_prompt))
+    }
+
+    /// Create an agent using Cohere models
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Unique identifier for this agent
+    /// * `api_key` - Cohere API key
+    /// * `model` - Model name (e.g., "command", "command-light", "command-nightly")
+    /// * `system_prompt` - System prompt defining the agent's role
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// use rig_patterns::Agent;
+    ///
+    /// # async fn example() -> anyhow::Result<()> {
+    /// let agent = Agent::from_cohere(
+    ///     "writer",
+    ///     "...",  // Your Cohere API key
+    ///     "command",
+    ///     "You write clear content"
+    /// )?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn from_cohere(
+        id: &str,
+        api_key: &str,
+        model: &str,
+        system_prompt: &str,
+    ) -> Result<Self> {
+        let client = rig::providers::cohere::Client::new(api_key);
+        let completion_model = client.completion_model(model);
+        Ok(Self::new(id, completion_model, system_prompt))
+    }
+
+    /// Create an agent from environment variables
+    ///
+    /// This helper reads API keys from environment variables and creates an agent
+    /// based on the specified provider.
+    ///
+    /// # Environment Variables
+    ///
+    /// * `OPENAI_API_KEY` - For OpenAI provider
+    /// * `ANTHROPIC_API_KEY` - For Anthropic provider
+    /// * `COHERE_API_KEY` - For Cohere provider
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Unique identifier for this agent
+    /// * `provider` - Provider name ("openai", "anthropic", or "cohere")
+    /// * `model` - Model name
+    /// * `system_prompt` - System prompt defining the agent's role
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// use rig_patterns::Agent;
+    ///
+    /// # async fn example() -> anyhow::Result<()> {
+    /// // Reads from OPENAI_API_KEY environment variable
+    /// let agent = Agent::from_env(
+    ///     "summarizer",
+    ///     "openai",
+    ///     "gpt-4",
+    ///     "You are a helpful summarizer"
+    /// )?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn from_env(
+        id: &str,
+        provider: &str,
+        model: &str,
+        system_prompt: &str,
+    ) -> Result<Self> {
+        match provider.to_lowercase().as_str() {
+            "openai" => {
+                let api_key = std::env::var("OPENAI_API_KEY")
+                    .map_err(|_| anyhow::anyhow!("OPENAI_API_KEY environment variable not set"))?;
+                Self::from_openai(id, &api_key, model, system_prompt)
+            }
+            "anthropic" => {
+                let api_key = std::env::var("ANTHROPIC_API_KEY")
+                    .map_err(|_| anyhow::anyhow!("ANTHROPIC_API_KEY environment variable not set"))?;
+                Self::from_anthropic(id, &api_key, model, system_prompt)
+            }
+            "cohere" => {
+                let api_key = std::env::var("COHERE_API_KEY")
+                    .map_err(|_| anyhow::anyhow!("COHERE_API_KEY environment variable not set"))?;
+                Self::from_cohere(id, &api_key, model, system_prompt)
+            }
+            _ => Err(anyhow::anyhow!(
+                "Unknown provider '{}'. Supported providers: openai, anthropic, cohere",
+                provider
+            )),
+        }
+    }
 }
 
 impl std::fmt::Debug for Agent {
@@ -87,7 +255,3 @@ impl std::fmt::Debug for Agent {
             .finish()
     }
 }
-
-// Note: We're not implementing Clone for the trait object directly,
-// but we can provide a manual clone implementation if needed
-// For now, we'll use the derived Clone which clones the Box

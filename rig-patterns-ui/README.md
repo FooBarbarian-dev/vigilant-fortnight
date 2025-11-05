@@ -253,28 +253,136 @@ Edit `static/styles.css` for visual styling, and `static/app.js` for interaction
 
 **Current Implementation**: The UI currently uses **mock execution** to demonstrate the interface without requiring real LLM API credentials. Mock responses simulate realistic execution patterns.
 
-**Real LLM Integration**: To connect real LLM providers:
+### Enabling Real LLM Execution
 
-1. Add environment variables for API keys (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, etc.)
-2. Update `src/routes/execute.rs` to create actual `Agent` instances using `rig-core`
-3. Replace mock responses with real orchestrator execution
+To connect real LLM providers and execute actual agent orchestrations:
 
-Example real implementation:
-```rust
-// In execute.rs, replace mock with:
-let mut agents = Vec::new();
-for config in request.agents {
-    let client = create_client(&config.provider, &config.model)?;
-    let agent = Agent::new(&config.id, client, &config.system_prompt);
-    agents.push(agent);
-}
+#### Step 1: Set Environment Variables
 
-let orchestrator = Orchestrator::new(agents)
-    .pattern(request.pattern.into())
-    .build()?;
+```bash
+# Copy the example env file
+cp ../.env.example .env
 
-let result = orchestrator.execute(&request.input).await?;
+# Edit .env and add your API keys:
+OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=sk-ant-...
+COHERE_API_KEY=...
 ```
+
+#### Step 2: Update execute.rs
+
+Replace the mock implementation in `src/routes/execute.rs` with real execution:
+
+```rust
+use rig_patterns::Agent;
+
+pub async fn execute_pattern(
+    _state: AxumState<Arc<crate::state::AppState>>,
+    Json(request): Json<ExecuteRequest>,
+) -> Result<Json<ExecuteResponse>, (StatusCode, String)> {
+    let start = Instant::now();
+
+    // Create real agents from configuration
+    let mut agents = Vec::new();
+    for config in request.agents {
+        let agent = Agent::from_env(
+            &config.id,
+            &config.provider,
+            &config.model,
+            &config.system_prompt,
+        ).map_err(|e| {
+            (StatusCode::BAD_REQUEST, format!("Failed to create agent: {}", e))
+        })?;
+
+        agents.push(agent);
+    }
+
+    // Build orchestrator with selected pattern
+    let orchestrator = Orchestrator::new(agents)
+        .pattern(request.pattern.into())
+        .build()
+        .map_err(|e| {
+            (StatusCode::BAD_REQUEST, format!("Failed to build orchestrator: {}", e))
+        })?;
+
+    // Execute the pattern
+    let result = orchestrator
+        .execute(&request.input)
+        .await
+        .map_err(|e| {
+            (StatusCode::INTERNAL_SERVER_ERROR, format!("Execution failed: {}", e))
+        })?;
+
+    let duration = start.elapsed();
+
+    Ok(Json(ExecuteResponse {
+        output: result.output,
+        execution_trace: result.pattern_metadata.trace,
+        metadata: serde_json::to_value(&result.pattern_metadata.details).unwrap_or_default(),
+        pattern_name: get_pattern_name(&request.pattern),
+        duration_ms: duration.as_millis(),
+    }))
+}
+```
+
+#### Step 3: Load Environment Variables
+
+Add to `src/main.rs` before starting the server:
+
+```rust
+#[tokio::main]
+async fn main() {
+    // Load .env file
+    dotenv::dotenv().ok();
+
+    // Rest of your main function...
+}
+```
+
+Add `dotenv` to `Cargo.toml`:
+```toml
+[dependencies]
+dotenv = "0.15"
+```
+
+#### Step 4: Run with Real LLMs
+
+```bash
+# Make sure your API keys are set
+export OPENAI_API_KEY="sk-..."
+
+# Run the server
+cargo run
+
+# Open http://localhost:3000
+# Agents will now make real LLM calls!
+```
+
+### Supported Providers in UI
+
+The UI configuration form supports:
+
+| Provider | Models | Environment Variable |
+|----------|--------|---------------------|
+| **OpenAI** | gpt-4, gpt-4-turbo-preview, gpt-3.5-turbo | `OPENAI_API_KEY` |
+| **Anthropic** | claude-3-opus-20240229, claude-3-sonnet-20240229, claude-3-haiku-20240307 | `ANTHROPIC_API_KEY` |
+| **Cohere** | command, command-light, command-nightly | `COHERE_API_KEY` |
+
+### Cost Considerations
+
+**Important**: Real LLM execution incurs API costs!
+
+- **Sequential patterns**: Cost = sum of all agent calls
+- **Concurrent patterns**: Cost = all agents × 1 (parallel calls)
+- **Group Chat**: Cost = agents × rounds
+- **Handoff**: Cost depends on handoff chain length
+- **Magentic**: Cost = manager + workers × iterations
+
+**Recommendations:**
+- Start with cheaper models (gpt-3.5-turbo, claude-haiku)
+- Test with mock execution first
+- Set up API usage alerts in provider dashboards
+- Use rate limiting to prevent runaway costs
 
 ## Production Considerations
 
