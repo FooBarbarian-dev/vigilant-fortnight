@@ -58,8 +58,9 @@ impl Agent {
         let prompt = format!("{}\n\nUser: {}", self.system_prompt, input);
 
         // Use rig's completion API
-        let response = self.model
-            .completion(prompt, None)
+        let response = self
+            .model
+            .completion(prompt)
             .await
             .map_err(|e| anyhow::anyhow!("Agent {} completion failed: {}", self.id, e))?;
 
@@ -102,12 +103,7 @@ impl Agent {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn from_openai(
-        id: &str,
-        api_key: &str,
-        model: &str,
-        system_prompt: &str,
-    ) -> Result<Self> {
+    pub fn from_openai(id: &str, api_key: &str, model: &str, system_prompt: &str) -> Result<Self> {
         let client = rig::providers::openai::Client::new(api_key);
         let completion_model = client.completion_model(model);
         Ok(Self::new(id, completion_model, system_prompt))
@@ -172,12 +168,7 @@ impl Agent {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn from_cohere(
-        id: &str,
-        api_key: &str,
-        model: &str,
-        system_prompt: &str,
-    ) -> Result<Self> {
+    pub fn from_cohere(id: &str, api_key: &str, model: &str, system_prompt: &str) -> Result<Self> {
         let client = rig::providers::cohere::Client::new(api_key);
         let completion_model = client.completion_model(model);
         Ok(Self::new(id, completion_model, system_prompt))
@@ -217,12 +208,7 @@ impl Agent {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn from_env(
-        id: &str,
-        provider: &str,
-        model: &str,
-        system_prompt: &str,
-    ) -> Result<Self> {
+    pub fn from_env(id: &str, provider: &str, model: &str, system_prompt: &str) -> Result<Self> {
         match provider.to_lowercase().as_str() {
             "openai" => {
                 let api_key = std::env::var("OPENAI_API_KEY")
@@ -230,8 +216,9 @@ impl Agent {
                 Self::from_openai(id, &api_key, model, system_prompt)
             }
             "anthropic" => {
-                let api_key = std::env::var("ANTHROPIC_API_KEY")
-                    .map_err(|_| anyhow::anyhow!("ANTHROPIC_API_KEY environment variable not set"))?;
+                let api_key = std::env::var("ANTHROPIC_API_KEY").map_err(|_| {
+                    anyhow::anyhow!("ANTHROPIC_API_KEY environment variable not set")
+                })?;
                 Self::from_anthropic(id, &api_key, model, system_prompt)
             }
             "cohere" => {
