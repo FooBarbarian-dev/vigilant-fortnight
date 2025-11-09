@@ -30,10 +30,6 @@ impl SimpleLedger {
         self.completed.insert(task.to_string());
     }
 
-    fn is_complete(&self, task: &str) -> bool {
-        self.completed.contains(task)
-    }
-
     fn pending_tasks(&self) -> Vec<&String> {
         self.tasks
             .iter()
@@ -82,6 +78,7 @@ impl MagenticExecutor {
     }
 
     /// Check if manager says work is complete
+    #[cfg(test)]
     fn check_completion(response: &str) -> bool {
         let upper = response.to_uppercase();
         upper.contains("COMPLETE")

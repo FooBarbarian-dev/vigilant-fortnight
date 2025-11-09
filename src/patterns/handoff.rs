@@ -94,7 +94,7 @@ impl PatternExecutor for HandoffExecutor {
 
         // Start with the first agent
         let mut current_agent = &agents[0];
-        let mut current_input = input.to_string();
+        let current_input = input.to_string();
         let mut final_output = String::new();
 
         metadata.add_trace(format!("Starting with agent '{}'", current_agent.id()));

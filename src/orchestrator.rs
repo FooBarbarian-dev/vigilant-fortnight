@@ -122,6 +122,9 @@ mod tests {
     fn test_builder_requires_agents() {
         let result = Orchestrator::new(vec![]).build();
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("at least one agent"));
+        match result {
+            Ok(_) => panic!("Expected error but got Ok"),
+            Err(e) => assert!(e.to_string().contains("at least one agent")),
+        }
     }
 }

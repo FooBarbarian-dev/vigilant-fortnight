@@ -1,16 +1,23 @@
 //! Agent wrapper providing a simplified interface over rig-core models
 
 use anyhow::Result;
-use rig::completion::CompletionModel;
-use rig::completion::Prompt;
+use rig::completion::{CompletionModel, CompletionRequestBuilder, ModelChoice};
+
+/// Supported LLM providers
+#[derive(Clone)]
+enum ModelProvider {
+    OpenAI(rig::providers::openai::CompletionModel),
+    Anthropic(rig::providers::anthropic::completion::CompletionModel),
+    Cohere(rig::providers::cohere::CompletionModel),
+}
 
 /// A simplified agent wrapper around rig-core completion models
 #[derive(Clone)]
 pub struct Agent {
     /// Unique identifier for this agent
     pub id: String,
-    /// The underlying completion model from rig-core
-    model: Box<dyn CompletionModel>,
+    /// The underlying completion model
+    model: ModelProvider,
     /// System prompt that defines the agent's role
     pub system_prompt: String,
 }
@@ -18,26 +25,12 @@ pub struct Agent {
 impl Agent {
     /// Create a new agent with a unique ID, model, and system prompt
     ///
-    /// # Arguments
-    ///
-    /// * `id` - Unique identifier for this agent
-    /// * `model` - Any type implementing rig-core's CompletionModel trait
-    /// * `prompt` - System prompt defining the agent's role and behavior
-    ///
-    /// # Example
-    ///
-    /// ```rust,no_run
-    /// use rig_patterns::Agent;
-    /// # async fn example() -> anyhow::Result<()> {
-    /// // let model = ...; // some rig CompletionModel
-    /// // let agent = Agent::new("summarizer", model, "You are a helpful summarizer");
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn new(id: &str, model: impl CompletionModel + 'static, prompt: &str) -> Self {
+    /// Note: For most use cases, prefer using `from_openai()`, `from_anthropic()`,
+    /// `from_cohere()`, or `from_env()` helper methods instead.
+    fn new_with_provider(id: &str, model: ModelProvider, prompt: &str) -> Self {
         Self {
             id: id.to_string(),
-            model: Box::new(model),
+            model,
             system_prompt: prompt.to_string(),
         }
     }
@@ -54,19 +47,58 @@ impl Agent {
     pub async fn prompt(&self, input: &str) -> Result<String> {
         tracing::debug!(agent_id = %self.id, "Prompting agent");
 
-        // Create a prompt with system message and user input
-        let prompt = format!("{}\n\nUser: {}", self.system_prompt, input);
+        // Create a completion request with system message and user input
+        let full_prompt = format!("{}\n\nUser: {}", self.system_prompt, input);
 
-        // Use rig's completion API
-        let response = self
-            .model
-            .completion(prompt)
-            .await
-            .map_err(|e| anyhow::anyhow!("Agent {} completion failed: {}", self.id, e))?;
+        // Use rig's completion API with proper request builder
+        let response_text = match &self.model {
+            ModelProvider::OpenAI(model) => {
+                let request = CompletionRequestBuilder::new(model.clone(), full_prompt)
+                    .build();
+                let response = model.completion(request).await
+                    .map_err(|e| anyhow::anyhow!("OpenAI completion failed: {}", e))?;
 
-        tracing::debug!(agent_id = %self.id, response_len = response.len(), "Agent responded");
+                // Extract text from response
+                match response.choice {
+                    ModelChoice::Message(text) => text,
+                    ModelChoice::ToolCall(name, _) => {
+                        anyhow::bail!("Unexpected tool call: {}", name)
+                    }
+                }
+            }
+            ModelProvider::Anthropic(model) => {
+                let request = CompletionRequestBuilder::new(model.clone(), full_prompt)
+                    .build();
+                let response = model.completion(request).await
+                    .map_err(|e| anyhow::anyhow!("Anthropic completion failed: {}", e))?;
 
-        Ok(response)
+                // Extract text from response
+                match response.choice {
+                    ModelChoice::Message(text) => text,
+                    ModelChoice::ToolCall(name, _) => {
+                        anyhow::bail!("Unexpected tool call: {}", name)
+                    }
+                }
+            }
+            ModelProvider::Cohere(model) => {
+                let request = CompletionRequestBuilder::new(model.clone(), full_prompt)
+                    .build();
+                let response = model.completion(request).await
+                    .map_err(|e| anyhow::anyhow!("Cohere completion failed: {}", e))?;
+
+                // Extract text from response
+                match response.choice {
+                    ModelChoice::Message(text) => text,
+                    ModelChoice::ToolCall(name, _) => {
+                        anyhow::bail!("Unexpected tool call: {}", name)
+                    }
+                }
+            }
+        };
+
+        tracing::debug!(agent_id = %self.id, response_len = response_text.len(), "Agent responded");
+
+        Ok(response_text)
     }
 
     /// Get the agent's ID
@@ -106,7 +138,11 @@ impl Agent {
     pub fn from_openai(id: &str, api_key: &str, model: &str, system_prompt: &str) -> Result<Self> {
         let client = rig::providers::openai::Client::new(api_key);
         let completion_model = client.completion_model(model);
-        Ok(Self::new(id, completion_model, system_prompt))
+        Ok(Self::new_with_provider(
+            id,
+            ModelProvider::OpenAI(completion_model),
+            system_prompt,
+        ))
     }
 
     /// Create an agent using Anthropic Claude models
@@ -139,9 +175,19 @@ impl Agent {
         model: &str,
         system_prompt: &str,
     ) -> Result<Self> {
-        let client = rig::providers::anthropic::Client::new(api_key);
+        // Anthropic client requires: api_key, base_url, betas (optional), version
+        let client = rig::providers::anthropic::Client::new(
+            api_key,
+            "https://api.anthropic.com", // base URL
+            None,                          // no beta features
+            "2023-06-01",                 // API version
+        );
         let completion_model = client.completion_model(model);
-        Ok(Self::new(id, completion_model, system_prompt))
+        Ok(Self::new_with_provider(
+            id,
+            ModelProvider::Anthropic(completion_model),
+            system_prompt,
+        ))
     }
 
     /// Create an agent using Cohere models
@@ -171,7 +217,11 @@ impl Agent {
     pub fn from_cohere(id: &str, api_key: &str, model: &str, system_prompt: &str) -> Result<Self> {
         let client = rig::providers::cohere::Client::new(api_key);
         let completion_model = client.completion_model(model);
-        Ok(Self::new(id, completion_model, system_prompt))
+        Ok(Self::new_with_provider(
+            id,
+            ModelProvider::Cohere(completion_model),
+            system_prompt,
+        ))
     }
 
     /// Create an agent from environment variables
