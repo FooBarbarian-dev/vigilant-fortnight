@@ -2,7 +2,6 @@
 
 use crate::state::{ExecuteRequest, ExecuteResponse, PatternConfig};
 use axum::{extract::State as AxumState, http::StatusCode, Json};
-use rig_patterns::{Agent, Orchestrator, Pattern};
 use std::sync::Arc;
 use std::time::Instant;
 

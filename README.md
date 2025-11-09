@@ -40,6 +40,89 @@ let orchestrator = Orchestrator::new(agents)
 let result = orchestrator.execute("Your input here").await?;
 ```
 
+## Getting Started
+
+This repository contains both the core `rig-patterns` library and an interactive web UI for demonstrations.
+
+### Prerequisites
+
+- Rust 1.70+ (install from [rustup.rs](https://rustup.rs))
+- API keys for LLM providers (optional for UI demo, required for real usage)
+
+### Building Everything
+
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/vigilant-fortnight.git
+cd vigilant-fortnight
+
+# Build the library
+cargo build --release
+
+# Build the UI application
+cd rig-patterns-ui
+cargo build --release
+cd ..
+```
+
+### Running the Examples
+
+The library includes several examples demonstrating different patterns:
+
+```bash
+# Run basic usage example
+cargo run --example basic_usage
+
+# Run pattern comparison (shows all 5 patterns)
+cargo run --example pattern_comparison
+
+# Run custom agents example
+cargo run --example custom_agents
+
+# Run real LLM integration (requires API keys)
+cargo run --example real_llm_integration
+```
+
+### Running the Interactive UI
+
+The UI provides a visual demonstration of all orchestration patterns with real-time execution visualization:
+
+```bash
+# From the root directory
+cd rig-patterns-ui
+cargo run --release
+
+# Or run directly from root
+cargo run --release --bin rig-patterns-ui
+```
+
+Then open your browser to `http://localhost:3000`
+
+**Features:**
+- Configure multiple agents with different roles
+- Switch between all 5 orchestration patterns
+- Real-time visualization of agent execution
+- Compare pattern performance side-by-side
+- Load preset configurations
+
+### Setting Up API Keys (Optional)
+
+For real LLM integration, create a `.env` file in the project root:
+
+```bash
+cp .env.example .env
+# Edit .env and add your API keys
+```
+
+Example `.env`:
+```bash
+OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=sk-ant-...
+COHERE_API_KEY=...
+```
+
+The examples and UI will use mock data if API keys are not configured.
+
 ## Quick Start
 
 Add to your `Cargo.toml`:

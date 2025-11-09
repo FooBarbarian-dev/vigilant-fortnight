@@ -6,7 +6,7 @@ authors = ["rig-patterns contributors"]
 description = "Interactive web UI for demonstrating rig-patterns orchestration"
 
 [dependencies]
-rig-patterns = { path = "../" }
+rig-patterns = { path = "../", features = ["yaml"] }
 rig-core = "0.4"
 axum = { version = "0.7", features = ["ws"] }
 tokio = { version = "1", features = ["full"] }
