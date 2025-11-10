@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>rig-patterns // NEURAL ORCHESTRATION SYSTEM</title>
+    <link rel="stylesheet" href="/styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Cyber Grid Background -->
+        <div class="cyber-grid"></div>
+
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-content">
+                <div class="logo-section">
+                    <div class="logo-glow"></div>
+                    <h1 class="cyber-title">
+                        <span class="glitch" data-text="RIG-PATTERNS">RIG-PATTERNS</span>
+                    </h1>
+                    <div class="subtitle">NEURAL ORCHESTRATION SYSTEM v2.1</div>
+                </div>
+                <div class="status-indicators">
+                    <div class="status-item">
+                        <span class="status-dot active"></span>
+                        <span>SYSTEM ONLINE</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-dot" id="ws-status"></span>
+                        <span id="ws-text">DISCONNECTED</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Left Sidebar: Agent Configuration -->
+            <aside class="agent-panel cyber-panel">
+                <div class="panel-header">
+                    <h3><span class="icon">◈</span> AGENT MATRIX</h3>
+                    <button id="add-agent" class="btn btn-primary cyber-btn">
+                        <span class="btn-glow"></span>
+                        <span class="btn-text">+ DEPLOY AGENT</span>
+                    </button>
+                </div>
+
+                <div id="agents-container" class="agents-grid">
+                    <!-- Agent cards will be added here dynamically -->
+                </div>
+
+                <div class="presets-section">
+                    <label for="load-preset"><span class="icon">⚡</span> LOAD PRESET CONFIG:</label>
+                    <select id="load-preset" class="cyber-select">
+                        <option value="">-- SELECT CONFIGURATION --</option>
+                    </select>
+                </div>
+            </aside>
+
+            <!-- Center: Execution Area -->
+            <main class="execution-area">
+                <!-- Pattern Selection -->
+                <div class="pattern-selector cyber-panel">
+                    <h3><span class="icon">⬢</span> ORCHESTRATION PROTOCOL</h3>
+                    <div class="pattern-controls">
+                        <label for="pattern-type">PATTERN MODE:</label>
+                        <select id="pattern-type" class="cyber-select">
+                            <option value="sequential">SEQUENTIAL // CHAIN</option>
+                            <option value="concurrent">CONCURRENT // PARALLEL</option>
+                            <option value="group_chat">GROUP_CHAT // CONSENSUS</option>
+                            <option value="handoff">HANDOFF // ROUTING</option>
+                            <option value="magentic">MAGENTIC // COORDINATED</option>
+                        </select>
+
+                        <!-- Pattern-specific options -->
+                        <div id="pattern-options" class="pattern-options">
+                            <!-- Dynamic options will be inserted here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Input Area -->
+                <div class="input-section cyber-panel">
+                    <label for="user-input"><span class="icon">⌘</span> NEURAL INPUT PROMPT:</label>
+                    <textarea
+                        id="user-input"
+                        class="cyber-textarea"
+                        placeholder=">>> ENTER NEURAL COMMAND..."
+                        rows="4"
+                    ></textarea>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="action-buttons">
+                    <button id="execute-stream" class="btn btn-primary cyber-btn btn-large">
+                        <span class="btn-glow"></span>
+                        <span class="btn-text">⚡ EXECUTE PROTOCOL</span>
+                    </button>
+                    <button id="compare-all" class="btn btn-secondary cyber-btn btn-large">
+                        <span class="btn-glow"></span>
+                        <span class="btn-text">⬡ COMPARE ALL</span>
+                    </button>
+                </div>
+
+                <!-- Conversation Display -->
+                <div id="conversation-container" class="conversation-container cyber-panel">
+                    <div class="panel-header">
+                        <h3><span class="icon">◉</span> NEURAL CONVERSATION LOG</h3>
+                        <button id="clear-conversation" class="btn btn-small cyber-btn">
+                            <span class="btn-text">CLEAR</span>
+                        </button>
+                    </div>
+                    <div id="conversation-log" class="conversation-log">
+                        <div class="log-placeholder">
+                            <div class="placeholder-icon">◉</div>
+                            <p>AWAITING NEURAL ACTIVITY...</p>
+                            <p class="placeholder-sub">Execute a pattern to see agent conversations</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Results Display -->
+                <div id="results-container" class="results-section cyber-panel" style="display: none;">
+                    <h3><span class="icon">◈</span> EXECUTION RESULTS</h3>
+                    <div id="results-content">
+                        <!-- Results will be dynamically inserted -->
+                    </div>
+                </div>
+            </main>
+
+            <!-- Right Sidebar: Visualization -->
+            <aside class="viz-panel cyber-panel">
+                <div class="panel-header">
+                    <h3><span class="icon">◬</span> SYSTEM VISUALIZATION</h3>
+                </div>
+                <div id="visualization" class="visualization-panel">
+                    <div id="viz-content" class="viz-content">
+                        <div class="viz-placeholder">
+                            <div class="viz-icon">◬</div>
+                            <p>VISUALIZATION STANDBY</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Agent Status Display -->
+                <div class="agent-status-panel">
+                    <h4>AGENT STATUS</h4>
+                    <div id="agent-status-list" class="agent-status-list">
+                        <p class="status-placeholder">No active agents</p>
+                    </div>
+                </div>
+            </aside>
+        </div>
+
+        <!-- Footer -->
+        <footer class="app-footer">
+            <div class="footer-content">
+                <p>
+                    <span class="footer-icon">◈</span>
+                    POWERED BY <a href="https://github.com/FooBarbarian-dev/vigilant-fortnight" target="_blank">RIG-PATTERNS</a>
+                    <span class="divider">|</span>
+                    NEURAL ORCHESTRATION FRAMEWORK
+                </p>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Agent Card Template -->
+    <template id="agent-card-template">
+        <div class="agent-card cyber-card">
+            <div class="agent-card-header">
+                <div class="agent-id-input">
+                    <span class="input-label">ID:</span>
+                    <input type="text" class="agent-id cyber-input" placeholder="agent-id" value="agent-1">
+                </div>
+                <button class="remove-agent cyber-btn-small" title="Decommission agent">×</button>
+            </div>
+            <div class="agent-field">
+                <span class="field-label">PROVIDER:</span>
+                <select class="agent-provider cyber-select-small">
+                    <option value="openai">OpenAI</option>
+                    <option value="anthropic">Anthropic</option>
+                    <option value="cohere">Cohere</option>
+                </select>
+            </div>
+            <div class="agent-field">
+                <span class="field-label">MODEL:</span>
+                <input type="text" class="agent-model cyber-input" placeholder="gpt-4" value="gpt-4">
+            </div>
+            <div class="agent-field">
+                <span class="field-label">ROLE:</span>
+                <textarea
+                    class="agent-prompt cyber-textarea-small"
+                    placeholder="System prompt defining agent's role"
+                    rows="2"
+                >You are a helpful assistant.</textarea>
+            </div>
+        </div>
+    </template>
+
+    <script src="/app.js"></script>
+</body>
+</html>

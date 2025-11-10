@@ -1,72 +1,143 @@
 // ========================================
-// rig-patterns UI Application Logic
+// rig-patterns Pattern Comparison UI
 // ========================================
 
 // State management
 let state = {
-    agents: [],
-    pattern: 'sequential',
-    patternOptions: {},
-    presets: [],
+    patterns: {
+        sequential: [],
+        concurrent: [],
+        group_chat: [],
+        handoff: [],
+        magentic: []
+    },
+    currentPattern: 'sequential',
     ws: null,
+    isExecuting: false
 };
 
 // ========================================
 // Initialization
 // ========================================
 
-document.addEventListener('DOMContentLoaded', async () => {
-    console.log('Initializing rig-patterns UI...');
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('Initializing rig-patterns Pattern Comparison UI...');
 
-    // Load presets
-    await loadPresets();
+    // Initialize Mermaid
+    mermaid.initialize({
+        startOnLoad: true,
+        theme: 'dark',
+        themeVariables: {
+            primaryColor: '#16213e',
+            primaryTextColor: '#00ffff',
+            primaryBorderColor: '#00ffff',
+            lineColor: '#00ff00',
+            secondaryColor: '#1a1a2e',
+            tertiaryColor: '#0f3460'
+        }
+    });
 
-    // Initialize with default agents
-    addDefaultAgents();
+    // Initialize default agents for each pattern
+    initializeDefaultAgents();
 
     // Set up event listeners
     setupEventListeners();
 
-    // Update pattern options
-    updatePatternOptions();
+    // Render initial DAGs
+    renderAllDAGs();
 
-    console.log('Initialization complete!');
+    console.log('✅ Initialization complete!');
 });
 
 // ========================================
-// Preset Loading
+// Default Agents Setup
 // ========================================
 
-async function loadPresets() {
-    try {
-        const response = await fetch('/api/presets');
-        const presets = await response.json();
-        state.presets = presets;
+function initializeDefaultAgents() {
+    // Sequential: 2 agents in chain
+    addAgent('sequential', 'agent1', 'openai', 'gpt-4', 'You are a helpful AI assistant.');
+    addAgent('sequential', 'agent2', 'openai', 'gpt-4', 'You are an expert analyzer.');
 
-        const select = document.getElementById('load-preset');
-        presets.forEach(preset => {
-            const option = document.createElement('option');
-            option.value = preset.name;
-            option.textContent = preset.name;
-            select.appendChild(option);
+    // Concurrent: 2 agents in parallel
+    addAgent('concurrent', 'reviewer1', 'openai', 'gpt-4', 'You review from a technical perspective.');
+    addAgent('concurrent', 'reviewer2', 'openai', 'gpt-4', 'You review from a business perspective.');
+
+    // Group Chat: 2 agents discussing
+    addAgent('group_chat', 'writer', 'openai', 'gpt-4', 'You write content. Include CONSENSUS_REACHED when satisfied.');
+    addAgent('group_chat', 'editor', 'openai', 'gpt-4', 'You edit for clarity.');
+
+    // Handoff: 2 agents with routing
+    addAgent('handoff', 'triage', 'openai', 'gpt-4', 'You triage tasks. Use HANDOFF:agent_id to route.');
+    addAgent('handoff', 'specialist', 'openai', 'gpt-4', 'You handle specialized tasks.');
+
+    // Magentic: Manager + Worker
+    addAgent('magentic', 'manager', 'openai', 'gpt-4', 'You are a project manager who breaks down tasks.');
+    addAgent('magentic', 'worker', 'openai', 'gpt-4', 'You complete assigned tasks efficiently.');
+}
+
+// ========================================
+// Event Listeners
+// ========================================
+
+function setupEventListeners() {
+    // Pattern tab switching
+    document.querySelectorAll('.pattern-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            const pattern = tab.dataset.pattern;
+            switchToPattern(pattern);
         });
+    });
 
-        console.log(`Loaded ${presets.length} presets`);
-    } catch (error) {
-        console.error('Failed to load presets:', error);
-    }
+    // Execute All button
+    document.getElementById('execute-all').addEventListener('click', executeAllPatterns);
+
+    // Add agent buttons
+    document.querySelectorAll('.add-agent-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const pattern = btn.dataset.pattern;
+            const agentNum = state.patterns[pattern].length + 1;
+            addAgent(pattern, `agent${agentNum}`, 'openai', 'gpt-4', 'You are a helpful assistant.');
+            renderDAG(pattern);
+        });
+    });
+}
+
+// ========================================
+// Pattern Tab Switching
+// ========================================
+
+function switchToPattern(pattern) {
+    state.currentPattern = pattern;
+
+    // Update tabs
+    document.querySelectorAll('.pattern-tab').forEach(tab => {
+        tab.classList.remove('active');
+        if (tab.dataset.pattern === pattern) {
+            tab.classList.add('active');
+        }
+    });
+
+    // Update panels
+    document.querySelectorAll('.pattern-panel').forEach(panel => {
+        panel.classList.remove('active');
+        if (panel.id === `panel-${pattern}`) {
+            panel.classList.add('active');
+        }
+    });
+
+    console.log(`Switched to ${pattern} pattern`);
 }
 
 // ========================================
 // Agent Management
 // ========================================
 
-function addDefaultAgents() {
-    addAgent('writer', 'openai', 'gpt-4', 'You write clear, concise content.');
-    addAgent('editor', 'openai', 'gpt-4', 'You edit for clarity and correctness.');
-}
+function addAgent(pattern, id, provider, model, prompt) {
+    const agent = { id, provider, model, system_prompt: prompt };
+    state.patterns[pattern].push(agent);
 
-function addAgent(id = `agent-${state.agents.length + 1}`, provider = 'openai', model = 'gpt-4', prompt = 'You are a helpful assistant.') {
+    // Add agent card to UI
+    const container = document.getElementById(`agents-${pattern}`);
     const template = document.getElementById('agent-card-template');
     const clone = template.content.cloneNode(true);
 
@@ -83,317 +154,400 @@ function addAgent(id = `agent-${state.agents.length + 1}`, provider = 'openai', 
     modelInput.value = model;
     promptTextarea.value = prompt;
 
-    // Remove button handler
-    removeBtn.addEventListener('click', () => {
-        card.remove();
-        updateState();
-    });
-
     // Update state on changes
-    [idInput, providerSelect, modelInput, promptTextarea].forEach(el => {
-        el.addEventListener('input', updateState);
-        el.addEventListener('change', updateState);
+    const updateAgent = () => {
+        const index = state.patterns[pattern].findIndex(a => a.id === idInput.value || a.id === id);
+        if (index !== -1) {
+            state.patterns[pattern][index] = {
+                id: idInput.value,
+                provider: providerSelect.value,
+                model: modelInput.value,
+                system_prompt: promptTextarea.value
+            };
+            renderDAG(pattern);
+        }
+    };
+
+    idInput.addEventListener('input', updateAgent);
+    providerSelect.addEventListener('change', updateAgent);
+    modelInput.addEventListener('input', updateAgent);
+    promptTextarea.addEventListener('input', updateAgent);
+
+    // Remove button
+    removeBtn.addEventListener('click', () => {
+        const index = state.patterns[pattern].findIndex(a => a.id === idInput.value);
+        if (index !== -1) {
+            state.patterns[pattern].splice(index, 1);
+            card.remove();
+            renderDAG(pattern);
+        }
     });
 
-    document.getElementById('agents-container').appendChild(clone);
-    updateState();
-}
-
-function getAgentsFromUI() {
-    const agents = [];
-    const cards = document.querySelectorAll('.agent-card');
-
-    cards.forEach(card => {
-        agents.push({
-            id: card.querySelector('.agent-id').value,
-            provider: card.querySelector('.agent-provider').value,
-            model: card.querySelector('.agent-model').value,
-            system_prompt: card.querySelector('.agent-prompt').value,
-        });
-    });
-
-    return agents;
+    container.appendChild(clone);
 }
 
 // ========================================
-// Pattern Configuration
+// DAG Visualization
 // ========================================
 
-function updatePatternOptions() {
-    const patternType = document.getElementById('pattern-type').value;
-    const optionsContainer = document.getElementById('pattern-options');
-
-    optionsContainer.innerHTML = '';
-
-    switch (patternType) {
-        case 'concurrent':
-            optionsContainer.innerHTML = `
-                <label for="aggregation">Aggregation:</label>
-                <select id="aggregation" class="select-input">
-                    <option value="vote">Vote</option>
-                    <option value="consensus">Consensus</option>
-                    <option value="combine">Combine</option>
-                </select>
-            `;
-            break;
-
-        case 'group_chat':
-            optionsContainer.innerHTML = `
-                <label for="max-rounds">Max Rounds:</label>
-                <input type="number" id="max-rounds" class="select-input" value="5" min="1" max="20" style="width: 80px;">
-            `;
-            break;
-
-        case 'handoff':
-            optionsContainer.innerHTML = `
-                <label for="max-hops">Max Hops:</label>
-                <input type="number" id="max-hops" class="select-input" value="10" min="1" max="50" style="width: 80px;">
-            `;
-            break;
-
-        case 'magentic':
-            optionsContainer.innerHTML = `
-                <label for="max-iterations">Max Iterations:</label>
-                <input type="number" id="max-iterations" class="select-input" value="10" min="1" max="50" style="width: 80px;">
-            `;
-            break;
-    }
-
-    state.pattern = patternType;
-    updateState();
+function renderAllDAGs() {
+    Object.keys(state.patterns).forEach(pattern => {
+        renderDAG(pattern);
+    });
 }
 
-function getPatternConfig() {
-    const patternType = state.pattern;
+function renderDAG(pattern) {
+    const agents = state.patterns[pattern];
+    const dagEl = document.getElementById(`dag-${pattern}`);
 
-    switch (patternType) {
+    let mermaidCode = '';
+
+    switch (pattern) {
         case 'sequential':
-            return { type: 'sequential' };
-
-        case 'concurrent': {
-            const aggregation = document.getElementById('aggregation')?.value || 'vote';
-            return {
-                type: 'concurrent',
-                aggregation: aggregation,
-            };
-        }
-
-        case 'group_chat': {
-            const maxRounds = parseInt(document.getElementById('max-rounds')?.value || '5', 10);
-            return {
-                type: 'group_chat',
-                max_rounds: maxRounds,
-            };
-        }
-
-        case 'handoff': {
-            const maxHops = parseInt(document.getElementById('max-hops')?.value || '10', 10);
-            return {
-                type: 'handoff',
-                max_hops: maxHops,
-            };
-        }
-
-        case 'magentic': {
-            const maxIterations = parseInt(document.getElementById('max-iterations')?.value || '10', 10);
-            return {
-                type: 'magentic',
-                max_iterations: maxIterations,
-            };
-        }
-
-        default:
-            return { type: 'sequential' };
-    }
-}
-
-// ========================================
-// Event Listeners Setup
-// ========================================
-
-function setupEventListeners() {
-    // Add agent button
-    document.getElementById('add-agent').addEventListener('click', () => {
-        addAgent();
-    });
-
-    // Pattern type change
-    document.getElementById('pattern-type').addEventListener('change', updatePatternOptions);
-
-    // Execute button (removed - using streaming only now)
-    // document.getElementById('execute').addEventListener('click', executePattern);
-
-    // Execute with streaming button
-    document.getElementById('execute-stream').addEventListener('click', executeWithStreaming);
-
-    // Compare all button
-    document.getElementById('compare-all').addEventListener('click', compareAllPatterns);
-
-    // Clear conversation button
-    const clearBtn = document.getElementById('clear-conversation');
-    if (clearBtn) {
-        clearBtn.addEventListener('click', clearConversation);
+            mermaidCode = generateSequentialDAG(agents);
+            break;
+        case 'concurrent':
+            mermaidCode = generateConcurrentDAG(agents);
+            break;
+        case 'group_chat':
+            mermaidCode = generateGroupChatDAG(agents);
+            break;
+        case 'handoff':
+            mermaidCode = generateHandoffDAG(agents);
+            break;
+        case 'magentic':
+            mermaidCode = generateMagenticDAG(agents);
+            break;
     }
 
-    // Load preset
-    document.getElementById('load-preset').addEventListener('change', (e) => {
-        const presetName = e.target.value;
-        if (presetName) {
-            loadPreset(presetName);
+    dagEl.textContent = mermaidCode;
+    dagEl.removeAttribute('data-processed');
+    mermaid.run({ nodes: [dagEl] });
+}
+
+function generateSequentialDAG(agents) {
+    let dag = 'graph LR\n    INPUT[Input]';
+    agents.forEach((agent, i) => {
+        const nodeId = `A${i + 1}`;
+        dag += ` --> ${nodeId}[${agent.id}<br/>${agent.provider}]`;
+    });
+    dag += ' --> OUTPUT[Output]\n';
+    dag += '    style INPUT fill:#1a1a2e,stroke:#00ffff\n';
+    agents.forEach((agent, i) => {
+        dag += `    style A${i + 1} fill:#16213e,stroke:#00ff00\n`;
+    });
+    dag += '    style OUTPUT fill:#1a1a2e,stroke:#ff00ff';
+    return dag;
+}
+
+function generateConcurrentDAG(agents) {
+    let dag = 'graph TD\n    INPUT[Input]';
+    agents.forEach((agent, i) => {
+        const nodeId = `A${i + 1}`;
+        dag += `\n    INPUT --> ${nodeId}[${agent.id}<br/>${agent.provider}]`;
+    });
+    dag += '\n    ';
+    agents.forEach((agent, i) => {
+        dag += `A${i + 1} --> `;
+    });
+    dag += 'AGG[Aggregator]\n    AGG --> OUTPUT[Output]\n';
+    dag += '    style INPUT fill:#1a1a2e,stroke:#00ffff\n';
+    agents.forEach((agent, i) => {
+        dag += `    style A${i + 1} fill:#16213e,stroke:#00ff00\n`;
+    });
+    dag += '    style AGG fill:#16213e,stroke:#ffff00\n';
+    dag += '    style OUTPUT fill:#1a1a2e,stroke:#ff00ff';
+    return dag;
+}
+
+function generateGroupChatDAG(agents) {
+    let dag = 'graph TD\n    INPUT[Input] --> R1[Round 1]\n';
+    agents.forEach((agent, i) => {
+        dag += `    R1 --> A1_${i}[${agent.id}<br/>${agent.provider}]\n`;
+    });
+    agents.forEach((agent, i) => {
+        dag += `    A1_${i} --> `;
+    });
+    dag += 'CON{Consensus?}\n';
+    dag += '    CON -->|Yes| OUTPUT[Output]\n';
+    dag += '    CON -->|No| R2[Round 2...]\n';
+    dag += '    style INPUT fill:#1a1a2e,stroke:#00ffff\n';
+    dag += '    style OUTPUT fill:#1a1a2e,stroke:#ff00ff';
+    return dag;
+}
+
+function generateHandoffDAG(agents) {
+    let dag = 'graph LR\n    INPUT[Input]';
+    agents.forEach((agent, i) => {
+        const nodeId = `A${i + 1}`;
+        if (i === 0) {
+            dag += ` --> ${nodeId}[${agent.id}<br/>${agent.provider}]`;
+        } else {
+            dag += `\n    A${i} -->|HANDOFF?| ${nodeId}[${agent.id}<br/>${agent.provider}]`;
         }
     });
+    dag += ' --> OUTPUT[Output]\n';
+    dag += '    style INPUT fill:#1a1a2e,stroke:#00ffff\n';
+    agents.forEach((agent, i) => {
+        dag += `    style A${i + 1} fill:#16213e,stroke:#00ff00\n`;
+    });
+    dag += '    style OUTPUT fill:#1a1a2e,stroke:#ff00ff';
+    return dag;
 }
 
-function clearConversation() {
-    const log = document.getElementById('conversation-log');
-    log.innerHTML = `
-        <div class="log-placeholder">
-            <div class="placeholder-icon">◉</div>
-            <p>AWAITING NEURAL ACTIVITY...</p>
-            <p class="placeholder-sub">Execute a pattern to see agent conversations</p>
-        </div>
-    `;
+function generateMagenticDAG(agents) {
+    if (agents.length === 0) return 'graph TD\n    EMPTY[No Agents]';
 
-    const statusList = document.getElementById('agent-status-list');
-    statusList.innerHTML = '<p class="status-placeholder">No active agents</p>';
-}
+    const manager = agents[0];
+    const workers = agents.slice(1);
 
-// ========================================
-// State Updates
-// ========================================
-
-function updateState() {
-    state.agents = getAgentsFromUI();
-    state.patternOptions = getPatternConfig();
+    let dag = `graph TD\n    INPUT[Input] --> MGR[${manager.id}<br/>${manager.provider}]\n`;
+    workers.forEach((worker, i) => {
+        dag += `    MGR --> T${i + 1}[Task ${i + 1}]\n`;
+        dag += `    T${i + 1} --> W${i + 1}[${worker.id}<br/>${worker.provider}]\n`;
+    });
+    if (workers.length > 0) {
+        dag += '    ';
+        workers.forEach((worker, i) => {
+            dag += `W${i + 1} --> `;
+        });
+        dag += 'SYN[Synthesize]\n    SYN --> MGR2[Manager]\n    MGR2 --> OUTPUT[Output]\n';
+    } else {
+        dag += '    MGR --> OUTPUT[Output]\n';
+    }
+    dag += '    style INPUT fill:#1a1a2e,stroke:#00ffff\n';
+    dag += `    style MGR fill:#16213e,stroke:#ffff00\n`;
+    workers.forEach((worker, i) => {
+        dag += `    style W${i + 1} fill:#16213e,stroke:#00ff00\n`;
+    });
+    dag += '    style OUTPUT fill:#1a1a2e,stroke:#ff00ff';
+    return dag;
 }
 
 // ========================================
 // Pattern Execution
 // ========================================
 
-async function executePattern() {
-    console.log('Executing pattern...');
+function executeAllPatterns() {
+    const rootPrompt = document.getElementById('root-prompt').value.trim();
 
-    updateState();
-
-    const input = document.getElementById('user-input').value.trim();
-
-    if (!input) {
-        alert('Please enter an input prompt');
+    if (!rootPrompt) {
+        alert('Please enter a root prompt');
         return;
     }
 
-    if (state.agents.length === 0) {
-        alert('Please add at least one agent');
-        return;
-    }
-
-    // Show loading
-    showVisualization('loading');
-
-    try {
-        const response = await fetch('/api/execute', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                agents: state.agents,
-                pattern: state.patternOptions,
-                input: input,
-            }),
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+    // Validate that all patterns have agents
+    for (const pattern in state.patterns) {
+        if (state.patterns[pattern].length === 0) {
+            alert(`${pattern} pattern has no agents. Please add at least one agent to each pattern.`);
+            return;
         }
-
-        const result = await response.json();
-        console.log('Execution result:', result);
-
-        // Show results
-        displayResults(result);
-    } catch (error) {
-        console.error('Execution failed:', error);
-        alert(`Execution failed: ${error.message}`);
-        hideVisualization();
     }
-}
 
-async function executeWithStreaming() {
-    console.log('========== EXECUTION START ==========');
-    console.log('Executing with streaming...');
+    if (state.isExecuting) {
+        alert('Execution already in progress');
+        return;
+    }
 
-    updateState();
+    console.log('========== EXECUTING ALL PATTERNS ==========');
+    console.log('Root Prompt:', rootPrompt);
 
-    const input = document.getElementById('user-input').value.trim();
-
-    console.log('Input:', input);
-    console.log('Current state:', {
-        agents: state.agents.length,
-        pattern: state.pattern,
-        patternOptions: state.patternOptions
+    // Clear all logs
+    Object.keys(state.patterns).forEach(pattern => {
+        const log = document.getElementById(`log-${pattern}`);
+        log.innerHTML = '';
+        updatePatternStatus(pattern, 'running');
     });
 
-    if (!input) {
-        alert('Please enter an input prompt');
-        return;
-    }
+    // Build pattern configs
+    const patternConfigs = {};
 
-    if (state.agents.length === 0) {
-        alert('Please add at least one agent');
-        return;
-    }
+    patternConfigs.sequential = {
+        pattern: { type: 'sequential' },
+        agents: state.patterns.sequential
+    };
 
-    // Create WebSocket connection
+    patternConfigs.concurrent = {
+        pattern: { type: 'concurrent', aggregation: 'Combine' },
+        agents: state.patterns.concurrent
+    };
+
+    patternConfigs.group_chat = {
+        pattern: { type: 'group_chat', max_rounds: 3 },
+        agents: state.patterns.group_chat
+    };
+
+    patternConfigs.handoff = {
+        pattern: { type: 'handoff', max_hops: 5 },
+        agents: state.patterns.handoff
+    };
+
+    patternConfigs.magentic = {
+        pattern: { type: 'magentic', max_iterations: 5 },
+        agents: state.patterns.magentic
+    };
+
+    const request = {
+        input: rootPrompt,
+        pattern_configs: patternConfigs
+    };
+
+    console.log('📤 Sending CompareRequest:', request);
+
+    // Connect WebSocket
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/ws`;
 
-    console.log('Connecting to WebSocket:', wsUrl);
-
     const ws = new WebSocket(wsUrl);
     state.ws = ws;
+    state.isExecuting = true;
 
     ws.onopen = () => {
-        console.log('✅ WebSocket connected successfully');
+        console.log('✅ WebSocket connected');
         updateWebSocketStatus('connected');
-
-        // Initialize visualization for pattern
-        initializeStreamingVisualization(state.pattern);
-
-        const request = {
-            agents: state.agents,
-            pattern: state.patternOptions,
-            input: input,
-        };
-
-        console.log('📤 Sending execution request:', request);
-        console.log('  → Agents:', state.agents.map(a => `${a.id}(${a.provider}:${a.model})`).join(', '));
-        console.log('  → Pattern:', state.patternOptions);
-        console.log('  → Input:', input);
-
-        // Send execution request
         ws.send(JSON.stringify(request));
     };
 
     ws.onmessage = (event) => {
         const message = JSON.parse(event.data);
-        console.log('📥 WebSocket message received:', message.type, message);
-        handleStreamingEvent(message);
+        console.log(`📥 [${message.pattern_id}] ${message.type}`, message);
+        handleExecutionEvent(message);
     };
 
     ws.onerror = (error) => {
         console.error('❌ WebSocket error:', error);
         updateWebSocketStatus('error');
-        alert('WebSocket connection failed');
+        state.isExecuting = false;
     };
 
     ws.onclose = () => {
         console.log('🔌 WebSocket closed');
-        console.log('========== EXECUTION END ==========');
+        console.log('========== EXECUTION COMPLETE ==========');
         updateWebSocketStatus('disconnected');
+        state.isExecuting = false;
         state.ws = null;
     };
+}
+
+// ========================================
+// Event Handling
+// ========================================
+
+function handleExecutionEvent(event) {
+    const patternId = event.pattern_id;
+    const log = document.getElementById(`log-${patternId}`);
+
+    if (!log) {
+        console.warn(`No log element found for pattern: ${patternId}`);
+        return;
+    }
+
+    const timestamp = new Date(event.timestamp).toLocaleTimeString();
+    let logEntry = '';
+
+    switch (event.type) {
+        case 'agent_receives_input':
+            logEntry = `<div class="log-entry input">
+                <span class="log-time">${timestamp}</span>
+                <span class="log-agent">${event.agent_id} (${event.provider})</span>
+                <span class="log-type">RECEIVES INPUT</span>
+                <div class="log-content">${escapeHtml(event.input.substring(0, 100))}...</div>
+            </div>`;
+            break;
+
+        case 'agent_thinking':
+            logEntry = `<div class="log-entry thinking">
+                <span class="log-time">${timestamp}</span>
+                <span class="log-agent">${event.agent_id} (${event.provider})</span>
+                <span class="log-type">THINKING...</span>
+            </div>`;
+            break;
+
+        case 'agent_responds':
+            logEntry = `<div class="log-entry response">
+                <span class="log-time">${timestamp}</span>
+                <span class="log-agent">${event.agent_id} (${event.provider})</span>
+                <span class="log-type">RESPONDS</span>
+                <div class="log-content">${escapeHtml(event.response)}</div>
+            </div>`;
+            break;
+
+        case 'agent_handoff':
+            logEntry = `<div class="log-entry handoff">
+                <span class="log-time">${timestamp}</span>
+                <span class="log-type">HANDOFF</span>
+                <div class="log-content">${event.from_agent} (${event.from_provider}) → ${event.to_agent} (${event.to_provider})</div>
+            </div>`;
+            break;
+
+        case 'pattern_step':
+            logEntry = `<div class="log-entry step">
+                <span class="log-time">${timestamp}</span>
+                <span class="log-type">STEP</span>
+                <div class="log-content">${escapeHtml(event.message)}</div>
+            </div>`;
+            break;
+
+        case 'conversation_message':
+            logEntry = `<div class="log-entry conversation ${event.message_type}">
+                <span class="log-time">${timestamp}</span>
+                <span class="log-agent">${event.from} (${event.provider})</span>
+                <span class="log-type">${event.message_type.toUpperCase()}</span>
+                <div class="log-content">${escapeHtml(event.message)}</div>
+            </div>`;
+            break;
+
+        case 'pattern_complete':
+            logEntry = `<div class="log-entry complete">
+                <span class="log-time">${timestamp}</span>
+                <span class="log-type">✅ PATTERN COMPLETE</span>
+                <div class="log-content"><strong>Output:</strong> ${escapeHtml(event.output)}</div>
+            </div>`;
+            updatePatternStatus(patternId, 'completed');
+            break;
+
+        case 'pattern_error':
+            logEntry = `<div class="log-entry error">
+                <span class="log-time">${timestamp}</span>
+                <span class="log-type">❌ ERROR</span>
+                <div class="log-content">${escapeHtml(event.error)}</div>
+            </div>`;
+            updatePatternStatus(patternId, 'error');
+            break;
+    }
+
+    if (logEntry) {
+        log.insertAdjacentHTML('beforeend', logEntry);
+        log.scrollTop = log.scrollHeight;
+    }
+}
+
+// ========================================
+// Status Updates
+// ========================================
+
+function updatePatternStatus(pattern, status) {
+    const badge = document.getElementById(`status-${pattern}`);
+    if (!badge) return;
+
+    badge.className = 'status-badge';
+
+    switch (status) {
+        case 'running':
+            badge.classList.add('running');
+            badge.textContent = 'RUNNING';
+            break;
+        case 'completed':
+            badge.classList.add('completed');
+            badge.textContent = 'COMPLETE';
+            break;
+        case 'error':
+            badge.classList.add('error');
+            badge.textContent = 'ERROR';
+            break;
+        default:
+            badge.textContent = 'READY';
+    }
 }
 
 function updateWebSocketStatus(status) {
@@ -417,552 +571,8 @@ function updateWebSocketStatus(status) {
     }
 }
 
-async function compareAllPatterns() {
-    console.log('Comparing all patterns...');
-
-    updateState();
-
-    const input = document.getElementById('user-input').value.trim();
-
-    if (!input) {
-        alert('Please enter an input prompt');
-        return;
-    }
-
-    if (state.agents.length === 0) {
-        alert('Please add at least one agent');
-        return;
-    }
-
-    // Show loading in comparison grid
-    const grid = document.getElementById('comparison-grid');
-    grid.style.display = 'grid';
-    grid.innerHTML = '<div class="loading-spinner"><div class="spinner"></div><p>Comparing all patterns...</p></div>';
-
-    // Hide regular results
-    document.getElementById('results-container').style.display = 'none';
-
-    try {
-        const response = await fetch('/api/compare', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                agents: state.agents,
-                input: input,
-            }),
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
-        console.log('Comparison results:', data);
-
-        // Display comparison grid
-        displayComparisonGrid(data.results);
-    } catch (error) {
-        console.error('Comparison failed:', error);
-        alert(`Comparison failed: ${error.message}`);
-        grid.style.display = 'none';
-    }
-}
-
 // ========================================
-// Visualization
-// ========================================
-
-function showVisualization(type) {
-    const viz = document.getElementById('viz-content');
-    viz.innerHTML = '';
-
-    if (type === 'loading') {
-        viz.innerHTML = '<div class="loading-spinner"><div class="spinner"></div><p>Executing pattern...</p></div>';
-        return;
-    }
-
-    // Pattern-specific visualization will be added by streaming
-}
-
-function hideVisualization() {
-    const viz = document.getElementById('viz-content');
-    viz.innerHTML = '<p class="viz-placeholder">Click "Execute" to start visualization</p>';
-}
-
-function initializeStreamingVisualization(patternType) {
-    const viz = document.getElementById('viz-content');
-    viz.innerHTML = '';
-
-    const container = document.createElement('div');
-    container.className = `pattern-viz ${patternType}`;
-    container.id = 'streaming-viz';
-
-    switch (patternType) {
-        case 'sequential':
-            state.agents.forEach((agent, idx) => {
-                const node = document.createElement('div');
-                node.className = 'agent-node pending';
-                node.id = `agent-${agent.id}`;
-                node.textContent = agent.id;
-                container.appendChild(node);
-
-                if (idx < state.agents.length - 1) {
-                    const arrow = document.createElement('div');
-                    arrow.className = 'arrow';
-                    arrow.textContent = '→';
-                    container.appendChild(arrow);
-                }
-            });
-            break;
-
-        case 'concurrent':
-            const concurrentContainer = document.createElement('div');
-            concurrentContainer.className = 'concurrent-agents';
-
-            state.agents.forEach(agent => {
-                const node = document.createElement('div');
-                node.className = 'agent-node pending';
-                node.id = `agent-${agent.id}`;
-                node.textContent = agent.id;
-                concurrentContainer.appendChild(node);
-            });
-
-            container.appendChild(concurrentContainer);
-
-            const aggregator = document.createElement('div');
-            aggregator.className = 'aggregator';
-            aggregator.textContent = '⇓ Aggregation ⇓';
-            container.appendChild(aggregator);
-            break;
-
-        case 'group_chat':
-            container.id = 'chat-container';
-            break;
-
-        case 'handoff':
-            container.className = 'pattern-viz handoff';
-            container.innerHTML = '<div class="handoff-chain" id="handoff-chain"></div>';
-            break;
-
-        case 'magentic':
-            container.innerHTML = '<div class="ledger" id="task-ledger"></div>';
-            break;
-    }
-
-    viz.appendChild(container);
-}
-
-function handleStreamingEvent(event) {
-    console.log(`🔔 Handling event: ${event.type}`, event);
-
-    switch (event.type) {
-        case 'agent_start':
-            updateAgentState(event.agent_id, 'processing');
-            addConversationMessage({
-                agent: event.agent_id,
-                type: 'start',
-                content: 'Agent activated',
-                timestamp: event.timestamp
-            });
-            break;
-
-        case 'agent_receives_input':
-            addConversationMessage({
-                agent: event.agent_id,
-                type: 'input',
-                content: event.input,
-                timestamp: event.timestamp
-            });
-            break;
-
-        case 'agent_thinking':
-            updateAgentState(event.agent_id, 'thinking');
-            addConversationMessage({
-                agent: event.agent_id,
-                type: 'thinking',
-                content: 'Processing...',
-                timestamp: event.timestamp
-            });
-            break;
-
-        case 'agent_responds':
-            addConversationMessage({
-                agent: event.agent_id,
-                type: 'output',
-                content: event.response,
-                timestamp: event.timestamp
-            });
-            break;
-
-        case 'agent_complete':
-            updateAgentState(event.agent_id, 'completed');
-            break;
-
-        case 'agent_error':
-            updateAgentState(event.agent_id, 'error');
-            addConversationMessage({
-                agent: event.agent_id,
-                type: 'error',
-                content: event.error,
-                timestamp: event.timestamp
-            });
-            break;
-
-        case 'agent_handoff':
-            addConversationMessage({
-                agent: event.from_agent,
-                type: 'handoff',
-                content: event.message,
-                toAgent: event.to_agent,
-                timestamp: event.timestamp
-            });
-            break;
-
-        case 'conversation_message':
-            addConversationMessage({
-                agent: event.from,
-                type: event.message_type,
-                content: event.message,
-                timestamp: event.timestamp
-            });
-            break;
-
-        case 'pattern_step':
-            addPatternStep(event.message);
-            break;
-
-        case 'pattern_complete':
-            handlePatternComplete(event);
-            break;
-
-        case 'pattern_error':
-            alert(`Pattern execution failed: ${event.error}`);
-            hideVisualization();
-            break;
-    }
-}
-
-function addConversationMessage(msg) {
-    const log = document.getElementById('conversation-log');
-
-    // Remove placeholder if present
-    const placeholder = log.querySelector('.log-placeholder');
-    if (placeholder) {
-        placeholder.remove();
-    }
-
-    const messageEl = document.createElement('div');
-    messageEl.className = msg.type === 'handoff' ? 'conversation-message handoff-message' : 'conversation-message';
-
-    const header = document.createElement('div');
-    header.className = 'message-header';
-
-    const agentSpan = document.createElement('span');
-    agentSpan.className = 'message-agent';
-    agentSpan.textContent = msg.agent;
-
-    const typeSpan = document.createElement('span');
-    typeSpan.className = `message-type ${msg.type}`;
-    typeSpan.textContent = msg.type.toUpperCase();
-
-    const timestampSpan = document.createElement('span');
-    timestampSpan.className = 'message-timestamp';
-    timestampSpan.textContent = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString() : '';
-
-    header.appendChild(agentSpan);
-    header.appendChild(typeSpan);
-    header.appendChild(timestampSpan);
-
-    const content = document.createElement('div');
-    content.className = 'message-content';
-
-    if (msg.type === 'thinking') {
-        content.innerHTML = '<span class="thinking-indicator"><span class="thinking-dots"></span></span>';
-    } else if (msg.type === 'handoff' && msg.toAgent) {
-        content.innerHTML = `${msg.content}<span class="handoff-arrow">→</span><strong>${msg.toAgent}</strong>`;
-    } else {
-        content.textContent = msg.content;
-    }
-
-    messageEl.appendChild(header);
-    messageEl.appendChild(content);
-    log.appendChild(messageEl);
-
-    // Auto-scroll to bottom
-    log.scrollTop = log.scrollHeight;
-
-    // Update agent status display
-    updateAgentStatusDisplay(msg.agent, msg.type);
-}
-
-function updateAgentStatusDisplay(agentId, status) {
-    const statusList = document.getElementById('agent-status-list');
-
-    // Remove placeholder if present
-    const placeholder = statusList.querySelector('.status-placeholder');
-    if (placeholder) {
-        placeholder.remove();
-    }
-
-    let statusItem = statusList.querySelector(`[data-agent="${agentId}"]`);
-
-    if (!statusItem) {
-        statusItem = document.createElement('div');
-        statusItem.className = 'agent-status-item';
-        statusItem.setAttribute('data-agent', agentId);
-        statusList.appendChild(statusItem);
-    }
-
-    const indicator = document.createElement('span');
-    indicator.className = 'agent-status-indicator';
-
-    switch (status) {
-        case 'thinking':
-            indicator.classList.add('thinking');
-            break;
-        case 'output':
-        case 'completed':
-            indicator.classList.add('complete');
-            break;
-        default:
-            indicator.classList.add('active');
-    }
-
-    statusItem.innerHTML = '';
-    statusItem.appendChild(indicator);
-    statusItem.appendChild(document.createTextNode(agentId));
-}
-
-function updateAgentState(agentId, state) {
-    const node = document.getElementById(`agent-${agentId}`);
-    if (node) {
-        node.className = `agent-node ${state}`;
-    }
-}
-
-function addPatternStep(message) {
-    // Add to conversation log
-    const log = document.getElementById('conversation-log');
-
-    // Remove placeholder if present
-    const placeholder = log.querySelector('.log-placeholder');
-    if (placeholder) {
-        placeholder.remove();
-    }
-
-    const stepEl = document.createElement('div');
-    stepEl.className = 'pattern-step';
-    stepEl.textContent = message;
-    log.appendChild(stepEl);
-
-    // Auto-scroll to bottom
-    log.scrollTop = log.scrollHeight;
-
-    // Also add to pattern-specific visualization
-    const pattern = state.pattern;
-
-    if (pattern === 'group_chat') {
-        const container = document.getElementById('chat-container');
-        if (container) {
-            const msg = document.createElement('div');
-            msg.className = 'chat-message';
-            msg.innerHTML = `<strong>${message.split(':')[0]}:</strong> ${message.split(':').slice(1).join(':')}`;
-            container.appendChild(msg);
-            container.scrollTop = container.scrollHeight;
-        }
-    } else if (pattern === 'handoff') {
-        const chain = document.getElementById('handoff-chain');
-        if (chain) {
-            const step = document.createElement('div');
-            step.className = 'handoff-arrow';
-            step.textContent = message;
-            chain.appendChild(step);
-        }
-    } else if (pattern === 'magentic') {
-        const ledger = document.getElementById('task-ledger');
-        if (ledger) {
-            const task = document.createElement('div');
-            if (message.startsWith('Completed:')) {
-                task.className = 'task completed';
-                task.textContent = '✓ ' + message.replace('Completed: ', '');
-            } else if (message.startsWith('Working on:')) {
-                task.className = 'task in-progress';
-                task.textContent = '⟳ ' + message.replace('Working on: ', '');
-            } else {
-                task.className = 'task pending';
-                task.textContent = '○ ' + message;
-            }
-            ledger.appendChild(task);
-        }
-    }
-}
-
-function handlePatternComplete(event) {
-    console.log('Pattern execution complete');
-
-    // Close WebSocket
-    if (state.ws) {
-        state.ws.close();
-        state.ws = null;
-    }
-
-    // Display final results
-    displayResults({
-        output: event.output,
-        execution_trace: [],
-        metadata: event.metadata,
-        pattern_name: state.pattern,
-        duration_ms: 0,
-    });
-}
-
-// ========================================
-// Results Display
-// ========================================
-
-function displayResults(result) {
-    const container = document.getElementById('results-container');
-    const content = document.getElementById('results-content');
-
-    container.style.display = 'block';
-    content.innerHTML = '';
-
-    // Metadata
-    const metadata = document.createElement('div');
-    metadata.className = 'result-metadata';
-    metadata.innerHTML = `
-        <span class="badge">${result.pattern_name}</span>
-        <span class="metric">Duration: ${result.duration_ms}ms</span>
-        <span class="metric">Agents: ${state.agents.length}</span>
-    `;
-    content.appendChild(metadata);
-
-    // Output
-    const output = document.createElement('div');
-    output.className = 'result-output';
-    output.innerHTML = `
-        <h4>Final Output</h4>
-        <pre>${escapeHtml(result.output)}</pre>
-    `;
-    content.appendChild(output);
-
-    // Trace (if available)
-    if (result.execution_trace && result.execution_trace.length > 0) {
-        const details = document.createElement('details');
-        details.innerHTML = `
-            <summary>Execution Trace (${result.execution_trace.length} steps)</summary>
-        `;
-
-        const traceContainer = document.createElement('div');
-        result.execution_trace.forEach((step, idx) => {
-            const stepDiv = document.createElement('div');
-            stepDiv.className = 'trace-step';
-            stepDiv.innerHTML = `<strong>Step ${idx + 1}:</strong><pre>${escapeHtml(step)}</pre>`;
-            traceContainer.appendChild(stepDiv);
-        });
-
-        details.appendChild(traceContainer);
-        content.appendChild(details);
-    }
-
-    // Scroll to results
-    container.scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
-
-function displayComparisonGrid(results) {
-    const grid = document.getElementById('comparison-grid');
-    grid.innerHTML = '';
-
-    Object.entries(results).forEach(([patternName, result]) => {
-        const column = document.createElement('div');
-        column.className = 'comparison-column';
-
-        column.innerHTML = `
-            <h3>${patternName}</h3>
-            <div class="viz-mini">
-                ${getPatternIcon(patternName)}
-            </div>
-            <div class="result-preview">${escapeHtml(result.output.substring(0, 200))}${result.output.length > 200 ? '...' : ''}</div>
-            <div class="metrics">${result.duration_ms}ms | ${state.agents.length} agents</div>
-        `;
-
-        grid.appendChild(column);
-    });
-}
-
-function getPatternIcon(patternName) {
-    const lower = patternName.toLowerCase();
-    if (lower.includes('sequential')) return '→→→';
-    if (lower.includes('concurrent')) return '⇉';
-    if (lower.includes('group')) return '💬';
-    if (lower.includes('handoff')) return '↷';
-    if (lower.includes('magentic')) return '☰';
-    return '🔄';
-}
-
-// ========================================
-// Preset Loading
-// ========================================
-
-function loadPreset(presetName) {
-    const preset = state.presets.find(p => p.name === presetName);
-    if (!preset) return;
-
-    console.log('Loading preset:', presetName);
-
-    // Clear existing agents
-    document.getElementById('agents-container').innerHTML = '';
-
-    // Add preset agents
-    preset.agents.forEach(agent => {
-        addAgent(agent.id, agent.provider, agent.model, agent.system_prompt);
-    });
-
-    // Set pattern
-    const patternType = preset.pattern.type;
-    document.getElementById('pattern-type').value = patternType;
-    updatePatternOptions();
-
-    // Set pattern-specific options
-    if (patternType === 'concurrent' && preset.pattern.aggregation) {
-        setTimeout(() => {
-            const aggSelect = document.getElementById('aggregation');
-            if (aggSelect) aggSelect.value = preset.pattern.aggregation;
-        }, 100);
-    } else if (patternType === 'group_chat' && preset.pattern.max_rounds) {
-        setTimeout(() => {
-            const roundsInput = document.getElementById('max-rounds');
-            if (roundsInput) roundsInput.value = preset.pattern.max_rounds;
-        }, 100);
-    } else if (patternType === 'handoff' && preset.pattern.max_hops) {
-        setTimeout(() => {
-            const hopsInput = document.getElementById('max-hops');
-            if (hopsInput) hopsInput.value = preset.pattern.max_hops;
-        }, 100);
-    } else if (patternType === 'magentic' && preset.pattern.max_iterations) {
-        setTimeout(() => {
-            const iterInput = document.getElementById('max-iterations');
-            if (iterInput) iterInput.value = preset.pattern.max_iterations;
-        }, 100);
-    }
-
-    // Set sample input
-    if (preset.sample_input) {
-        document.getElementById('user-input').value = preset.sample_input;
-    }
-
-    // Reset results
-    document.getElementById('results-container').style.display = 'none';
-    document.getElementById('comparison-grid').style.display = 'none';
-    hideVisualization();
-
-    updateState();
-}
-
-// ========================================
-// Utilities
+// Utility Functions
 // ========================================
 
 function escapeHtml(text) {

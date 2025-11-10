@@ -3,11 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>rig-patterns // NEURAL ORCHESTRATION SYSTEM</title>
+    <title>rig-patterns // PATTERN COMPARISON SYSTEM</title>
     <link rel="stylesheet" href="/styles.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
 </head>
 <body>
     <div class="app-container">
@@ -22,7 +23,7 @@
                     <h1 class="cyber-title">
                         <span class="glitch" data-text="RIG-PATTERNS">RIG-PATTERNS</span>
                     </h1>
-                    <div class="subtitle">NEURAL ORCHESTRATION SYSTEM v2.1</div>
+                    <div class="subtitle">PATTERN COMPARISON SYSTEM v3.0</div>
                 </div>
                 <div class="status-indicators">
                     <div class="status-item">
@@ -39,165 +40,293 @@
 
         <!-- Main Content -->
         <div class="main-content">
-            <!-- Left Sidebar: Agent Configuration -->
-            <aside class="agent-panel cyber-panel">
-                <div class="panel-header">
-                    <h3><span class="icon">◈</span> AGENT MATRIX</h3>
-                    <button id="add-agent" class="btn btn-primary cyber-btn">
-                        <span class="btn-glow"></span>
-                        <span class="btn-text">+ DEPLOY AGENT</span>
-                    </button>
-                </div>
+            <!-- Root Prompt Section -->
+            <div class="root-prompt-section cyber-panel">
+                <h3><span class="icon">⌘</span> ROOT NEURAL PROMPT</h3>
+                <textarea
+                    id="root-prompt"
+                    class="cyber-textarea"
+                    placeholder=">>> ENTER NEURAL COMMAND TO BE PROCESSED BY ALL PATTERNS..."
+                    rows="3"
+                >Explain the benefits of Rust for systems programming</textarea>
 
-                <div id="agents-container" class="agents-grid">
-                    <!-- Agent cards will be added here dynamically -->
-                </div>
-
-                <div class="presets-section">
-                    <label for="load-preset"><span class="icon">⚡</span> LOAD PRESET CONFIG:</label>
-                    <select id="load-preset" class="cyber-select">
-                        <option value="">-- SELECT CONFIGURATION --</option>
-                    </select>
-                </div>
-            </aside>
-
-            <!-- Center: Execution Area -->
-            <main class="execution-area">
-                <!-- Pattern Selection -->
-                <div class="pattern-selector cyber-panel">
-                    <h3><span class="icon">⬢</span> ORCHESTRATION PROTOCOL</h3>
-                    <div class="pattern-controls">
-                        <label for="pattern-type">PATTERN MODE:</label>
-                        <select id="pattern-type" class="cyber-select">
-                            <option value="sequential">SEQUENTIAL // CHAIN</option>
-                            <option value="concurrent">CONCURRENT // PARALLEL</option>
-                            <option value="group_chat">GROUP_CHAT // CONSENSUS</option>
-                            <option value="handoff">HANDOFF // ROUTING</option>
-                            <option value="magentic">MAGENTIC // COORDINATED</option>
-                        </select>
-
-                        <!-- Pattern-specific options -->
-                        <div id="pattern-options" class="pattern-options">
-                            <!-- Dynamic options will be inserted here -->
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Input Area -->
-                <div class="input-section cyber-panel">
-                    <label for="user-input"><span class="icon">⌘</span> NEURAL INPUT PROMPT:</label>
-                    <textarea
-                        id="user-input"
-                        class="cyber-textarea"
-                        placeholder=">>> ENTER NEURAL COMMAND..."
-                        rows="4"
-                    ></textarea>
-                </div>
-
-                <!-- Action Buttons -->
                 <div class="action-buttons">
-                    <button id="execute-stream" class="btn btn-primary cyber-btn btn-large">
+                    <button id="execute-all" class="btn btn-primary cyber-btn btn-large">
                         <span class="btn-glow"></span>
-                        <span class="btn-text">⚡ EXECUTE PROTOCOL</span>
-                    </button>
-                    <button id="compare-all" class="btn btn-secondary cyber-btn btn-large">
-                        <span class="btn-glow"></span>
-                        <span class="btn-text">⬡ COMPARE ALL</span>
+                        <span class="btn-text">⚡ EXECUTE ALL PATTERNS</span>
                     </button>
                 </div>
-
-                <!-- Conversation Display -->
-                <div id="conversation-container" class="conversation-container cyber-panel">
-                    <div class="panel-header">
-                        <h3><span class="icon">◉</span> NEURAL CONVERSATION LOG</h3>
-                        <button id="clear-conversation" class="btn btn-small cyber-btn">
-                            <span class="btn-text">CLEAR</span>
-                        </button>
-                    </div>
-                    <div id="conversation-log" class="conversation-log">
-                        <div class="log-placeholder">
-                            <div class="placeholder-icon">◉</div>
-                            <p>AWAITING NEURAL ACTIVITY...</p>
-                            <p class="placeholder-sub">Execute a pattern to see agent conversations</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Results Display -->
-                <div id="results-container" class="results-section cyber-panel" style="display: none;">
-                    <h3><span class="icon">◈</span> EXECUTION RESULTS</h3>
-                    <div id="results-content">
-                        <!-- Results will be dynamically inserted -->
-                    </div>
-                </div>
-            </main>
-
-            <!-- Right Sidebar: Visualization -->
-            <aside class="viz-panel cyber-panel">
-                <div class="panel-header">
-                    <h3><span class="icon">◬</span> SYSTEM VISUALIZATION</h3>
-                </div>
-                <div id="visualization" class="visualization-panel">
-                    <div id="viz-content" class="viz-content">
-                        <div class="viz-placeholder">
-                            <div class="viz-icon">◬</div>
-                            <p>VISUALIZATION STANDBY</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Agent Status Display -->
-                <div class="agent-status-panel">
-                    <h4>AGENT STATUS</h4>
-                    <div id="agent-status-list" class="agent-status-list">
-                        <p class="status-placeholder">No active agents</p>
-                    </div>
-                </div>
-            </aside>
-        </div>
-
-        <!-- Footer -->
-        <footer class="app-footer">
-            <div class="footer-content">
-                <p>
-                    <span class="footer-icon">◈</span>
-                    POWERED BY <a href="https://github.com/FooBarbarian-dev/vigilant-fortnight" target="_blank">RIG-PATTERNS</a>
-                    <span class="divider">|</span>
-                    NEURAL ORCHESTRATION FRAMEWORK
-                </p>
             </div>
-        </footer>
+
+            <!-- Pattern Tabs -->
+            <div class="pattern-tabs-container cyber-panel">
+                <div class="panel-header">
+                    <h3><span class="icon">⬢</span> ORCHESTRATION PATTERNS</h3>
+                </div>
+
+                <div class="pattern-tabs">
+                    <button class="pattern-tab active" data-pattern="sequential">
+                        <span class="tab-text">SEQUENTIAL</span>
+                        <span class="status-badge" id="status-sequential">READY</span>
+                    </button>
+                    <button class="pattern-tab" data-pattern="concurrent">
+                        <span class="tab-text">CONCURRENT</span>
+                        <span class="status-badge" id="status-concurrent">READY</span>
+                    </button>
+                    <button class="pattern-tab" data-pattern="group_chat">
+                        <span class="tab-text">GROUP CHAT</span>
+                        <span class="status-badge" id="status-group_chat">READY</span>
+                    </button>
+                    <button class="pattern-tab" data-pattern="handoff">
+                        <span class="tab-text">HANDOFF</span>
+                        <span class="status-badge" id="status-handoff">READY</span>
+                    </button>
+                    <button class="pattern-tab" data-pattern="magentic">
+                        <span class="tab-text">MAGENTIC</span>
+                        <span class="status-badge" id="status-magentic">READY</span>
+                    </button>
+                </div>
+
+                <!-- Pattern Panels -->
+                <div class="pattern-panels">
+                    <!-- Sequential Panel -->
+                    <div class="pattern-panel active" id="panel-sequential">
+                        <div class="panel-description">
+                            <p>🔗 <strong>Sequential Pattern:</strong> Agents process input in order, each receiving the previous agent's output.</p>
+                        </div>
+
+                        <div class="agent-config-section">
+                            <h4><span class="icon">◈</span> Agent Configuration</h4>
+                            <div class="agent-configs" id="agents-sequential">
+                                <!-- Agent config cards will be added here -->
+                            </div>
+                            <button class="btn btn-small cyber-btn add-agent-btn" data-pattern="sequential">
+                                <span class="btn-text">+ ADD AGENT</span>
+                            </button>
+                        </div>
+
+                        <div class="dag-section">
+                            <h4><span class="icon">◬</span> Expected Execution DAG</h4>
+                            <div class="dag-container">
+                                <pre class="mermaid" id="dag-sequential">
+graph LR
+    INPUT[Input] --> A1[Agent 1<br/>openai]
+    A1 --> A2[Agent 2<br/>openai]
+    A2 --> OUTPUT[Output]
+    style INPUT fill:#1a1a2e,stroke:#00ffff
+    style A1 fill:#16213e,stroke:#00ff00
+    style A2 fill:#16213e,stroke:#00ff00
+    style OUTPUT fill:#1a1a2e,stroke:#ff00ff
+                                </pre>
+                            </div>
+                        </div>
+
+                        <div class="execution-log-section">
+                            <h4><span class="icon">◉</span> Execution Log</h4>
+                            <div class="execution-log" id="log-sequential">
+                                <div class="log-placeholder">Awaiting execution...</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Concurrent Panel -->
+                    <div class="pattern-panel" id="panel-concurrent">
+                        <div class="panel-description">
+                            <p>⚡ <strong>Concurrent Pattern:</strong> All agents process the same input in parallel, results are aggregated.</p>
+                        </div>
+
+                        <div class="agent-config-section">
+                            <h4><span class="icon">◈</span> Agent Configuration</h4>
+                            <div class="agent-configs" id="agents-concurrent"></div>
+                            <button class="btn btn-small cyber-btn add-agent-btn" data-pattern="concurrent">
+                                <span class="btn-text">+ ADD AGENT</span>
+                            </button>
+                        </div>
+
+                        <div class="dag-section">
+                            <h4><span class="icon">◬</span> Expected Execution DAG</h4>
+                            <div class="dag-container">
+                                <pre class="mermaid" id="dag-concurrent">
+graph TD
+    INPUT[Input] --> A1[Agent 1<br/>openai]
+    INPUT --> A2[Agent 2<br/>openai]
+    A1 --> AGG[Aggregator]
+    A2 --> AGG
+    AGG --> OUTPUT[Output]
+    style INPUT fill:#1a1a2e,stroke:#00ffff
+    style A1 fill:#16213e,stroke:#00ff00
+    style A2 fill:#16213e,stroke:#00ff00
+    style AGG fill:#16213e,stroke:#ffff00
+    style OUTPUT fill:#1a1a2e,stroke:#ff00ff
+                                </pre>
+                            </div>
+                        </div>
+
+                        <div class="execution-log-section">
+                            <h4><span class="icon">◉</span> Execution Log</h4>
+                            <div class="execution-log" id="log-concurrent">
+                                <div class="log-placeholder">Awaiting execution...</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Group Chat Panel -->
+                    <div class="pattern-panel" id="panel-group_chat">
+                        <div class="panel-description">
+                            <p>💬 <strong>Group Chat Pattern:</strong> Agents converse in rounds until consensus is reached.</p>
+                        </div>
+
+                        <div class="agent-config-section">
+                            <h4><span class="icon">◈</span> Agent Configuration</h4>
+                            <div class="agent-configs" id="agents-group_chat"></div>
+                            <button class="btn btn-small cyber-btn add-agent-btn" data-pattern="group_chat">
+                                <span class="btn-text">+ ADD AGENT</span>
+                            </button>
+                        </div>
+
+                        <div class="dag-section">
+                            <h4><span class="icon">◬</span> Expected Execution DAG</h4>
+                            <div class="dag-container">
+                                <pre class="mermaid" id="dag-group_chat">
+graph TD
+    INPUT[Input] --> R1[Round 1]
+    R1 --> A1[Agent 1<br/>openai]
+    R1 --> A2[Agent 2<br/>openai]
+    A1 --> R2[Round 2]
+    A2 --> R2
+    R2 --> A3[Agent 1<br/>openai]
+    R2 --> A4[Agent 2<br/>openai]
+    A3 --> CON[Consensus?]
+    A4 --> CON
+    CON -->|Yes| OUTPUT[Output]
+    CON -->|No| R3[Round 3...]
+    style INPUT fill:#1a1a2e,stroke:#00ffff
+    style OUTPUT fill:#1a1a2e,stroke:#ff00ff
+                                </pre>
+                            </div>
+                        </div>
+
+                        <div class="execution-log-section">
+                            <h4><span class="icon">◉</span> Execution Log</h4>
+                            <div class="execution-log" id="log-group_chat">
+                                <div class="log-placeholder">Awaiting execution...</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Handoff Panel -->
+                    <div class="pattern-panel" id="panel-handoff">
+                        <div class="panel-description">
+                            <p>🔀 <strong>Handoff Pattern:</strong> Agents explicitly hand off tasks to each other using HANDOFF markers.</p>
+                        </div>
+
+                        <div class="agent-config-section">
+                            <h4><span class="icon">◈</span> Agent Configuration</h4>
+                            <div class="agent-configs" id="agents-handoff"></div>
+                            <button class="btn btn-small cyber-btn add-agent-btn" data-pattern="handoff">
+                                <span class="btn-text">+ ADD AGENT</span>
+                            </button>
+                        </div>
+
+                        <div class="dag-section">
+                            <h4><span class="icon">◬</span> Expected Execution DAG</h4>
+                            <div class="dag-container">
+                                <pre class="mermaid" id="dag-handoff">
+graph LR
+    INPUT[Input] --> A1[Agent 1<br/>openai]
+    A1 -->|HANDOFF| A2[Agent 2<br/>openai]
+    A2 --> OUTPUT[Output]
+    style INPUT fill:#1a1a2e,stroke:#00ffff
+    style A1 fill:#16213e,stroke:#00ff00
+    style A2 fill:#16213e,stroke:#00ff00
+    style OUTPUT fill:#1a1a2e,stroke:#ff00ff
+                                </pre>
+                            </div>
+                        </div>
+
+                        <div class="execution-log-section">
+                            <h4><span class="icon">◉</span> Execution Log</h4>
+                            <div class="execution-log" id="log-handoff">
+                                <div class="log-placeholder">Awaiting execution...</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Magentic Panel -->
+                    <div class="pattern-panel" id="panel-magentic">
+                        <div class="panel-description">
+                            <p>🎯 <strong>Magentic Pattern:</strong> Manager agent breaks down tasks and coordinates worker agents.</p>
+                        </div>
+
+                        <div class="agent-config-section">
+                            <h4><span class="icon">◈</span> Agent Configuration</h4>
+                            <p class="config-note">Note: First agent is the Manager, others are Workers</p>
+                            <div class="agent-configs" id="agents-magentic"></div>
+                            <button class="btn btn-small cyber-btn add-agent-btn" data-pattern="magentic">
+                                <span class="btn-text">+ ADD AGENT</span>
+                            </button>
+                        </div>
+
+                        <div class="dag-section">
+                            <h4><span class="icon">◬</span> Expected Execution DAG</h4>
+                            <div class="dag-container">
+                                <pre class="mermaid" id="dag-magentic">
+graph TD
+    INPUT[Input] --> MGR[Manager<br/>openai]
+    MGR --> T1[Task 1]
+    MGR --> T2[Task 2]
+    T1 --> W1[Worker 1<br/>openai]
+    T2 --> W2[Worker 2<br/>openai]
+    W1 --> SYN[Synthesize]
+    W2 --> SYN
+    SYN --> MGR2[Manager]
+    MGR2 --> OUTPUT[Output]
+    style INPUT fill:#1a1a2e,stroke:#00ffff
+    style MGR fill:#16213e,stroke:#ffff00
+    style MGR2 fill:#16213e,stroke:#ffff00
+    style W1 fill:#16213e,stroke:#00ff00
+    style W2 fill:#16213e,stroke:#00ff00
+    style OUTPUT fill:#1a1a2e,stroke:#ff00ff
+                                </pre>
+                            </div>
+                        </div>
+
+                        <div class="execution-log-section">
+                            <h4><span class="icon">◉</span> Execution Log</h4>
+                            <div class="execution-log" id="log-magentic">
+                                <div class="log-placeholder">Awaiting execution...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Agent Card Template -->
     <template id="agent-card-template">
-        <div class="agent-card cyber-card">
+        <div class="agent-card">
             <div class="agent-card-header">
-                <div class="agent-id-input">
-                    <span class="input-label">ID:</span>
-                    <input type="text" class="agent-id cyber-input" placeholder="agent-id" value="agent-1">
+                <input type="text" class="agent-id cyber-input" placeholder="agent-id" />
+                <button class="remove-agent btn btn-danger">×</button>
+            </div>
+            <div class="agent-card-body">
+                <div class="form-group">
+                    <label>Provider:</label>
+                    <select class="agent-provider cyber-select">
+                        <option value="openai">OpenAI</option>
+                        <option value="anthropic">Anthropic</option>
+                        <option value="cohere">Cohere</option>
+                    </select>
                 </div>
-                <button class="remove-agent cyber-btn-small" title="Decommission agent">×</button>
-            </div>
-            <div class="agent-field">
-                <span class="field-label">PROVIDER:</span>
-                <select class="agent-provider cyber-select-small">
-                    <option value="openai">OpenAI</option>
-                    <option value="anthropic">Anthropic</option>
-                    <option value="cohere">Cohere</option>
-                </select>
-            </div>
-            <div class="agent-field">
-                <span class="field-label">MODEL:</span>
-                <input type="text" class="agent-model cyber-input" placeholder="gpt-4" value="gpt-4">
-            </div>
-            <div class="agent-field">
-                <span class="field-label">ROLE:</span>
-                <textarea
-                    class="agent-prompt cyber-textarea-small"
-                    placeholder="System prompt defining agent's role"
-                    rows="2"
-                >You are a helpful assistant.</textarea>
+                <div class="form-group">
+                    <label>Model:</label>
+                    <input type="text" class="agent-model cyber-input" placeholder="gpt-4" />
+                </div>
+                <div class="form-group">
+                    <label>System Prompt:</label>
+                    <textarea class="agent-prompt cyber-textarea" rows="3" placeholder="You are a helpful assistant..."></textarea>
+                </div>
             </div>
         </div>
     </template>
