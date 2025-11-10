@@ -92,7 +92,10 @@
                     <!-- Sequential Panel -->
                     <div class="pattern-panel active" id="panel-sequential">
                         <div class="panel-description">
-                            <p>🔗 <strong>Sequential Pattern:</strong> Agents process input in order, each receiving the previous agent's output.</p>
+                            <h3>🔗 Sequential Pattern</h3>
+                            <p><strong>How it works:</strong> Agents execute in order, forming a processing pipeline. Each agent receives the output of the previous agent as its input, allowing for progressive refinement and multi-stage processing.</p>
+                            <p><strong>Adding agents:</strong> Each additional agent adds another stage to the pipeline, increasing processing depth. Use this for workflows like research → analysis → summary, or translation → editing → formatting.</p>
+                            <p><strong>Best for:</strong> Multi-step workflows, progressive refinement, chain-of-thought processing.</p>
                         </div>
 
                         <div class="agent-config-section">
@@ -127,12 +130,22 @@ graph LR
                                 <div class="log-placeholder">Awaiting execution...</div>
                             </div>
                         </div>
+
+                        <div class="final-result-section">
+                            <h4><span class="icon">✓</span> Final Result</h4>
+                            <div class="final-result" id="result-sequential">
+                                <div class="result-placeholder">No result yet. Execute patterns to see the final output.</div>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Concurrent Panel -->
                     <div class="pattern-panel" id="panel-concurrent">
                         <div class="panel-description">
-                            <p>⚡ <strong>Concurrent Pattern:</strong> All agents process the same input in parallel, results are aggregated.</p>
+                            <h3>⚡ Concurrent Pattern</h3>
+                            <p><strong>How it works:</strong> All agents receive the same input simultaneously and process it in parallel. Their outputs are collected and aggregated into a single result using the configured aggregation strategy (combine, vote, or consensus).</p>
+                            <p><strong>Adding agents:</strong> More agents provide diverse perspectives on the same problem. Each agent can use different models or prompts, enabling comparison of approaches or gathering multiple viewpoints that get synthesized.</p>
+                            <p><strong>Best for:</strong> Comparing different models, gathering diverse opinions, parallel processing, consensus-building.</p>
                         </div>
 
                         <div class="agent-config-section">
@@ -168,12 +181,22 @@ graph TD
                                 <div class="log-placeholder">Awaiting execution...</div>
                             </div>
                         </div>
+
+                        <div class="final-result-section">
+                            <h4><span class="icon">✓</span> Final Result</h4>
+                            <div class="final-result" id="result-concurrent">
+                                <div class="result-placeholder">No result yet. Execute patterns to see the final output.</div>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Group Chat Panel -->
                     <div class="pattern-panel" id="panel-group_chat">
                         <div class="panel-description">
-                            <p>💬 <strong>Group Chat Pattern:</strong> Agents converse in rounds until consensus is reached.</p>
+                            <h3>💬 Group Chat Pattern</h3>
+                            <p><strong>How it works:</strong> Agents engage in multi-round discussions, where each agent can see and respond to outputs from all other agents. The conversation continues for a configured number of rounds or until consensus emerges.</p>
+                            <p><strong>Adding agents:</strong> More agents enrich the conversation with additional perspectives and expertise. Each agent can represent different roles (critic, supporter, specialist) leading to more thorough deliberation.</p>
+                            <p><strong>Best for:</strong> Collaborative problem-solving, debate and deliberation, complex decision-making, peer review scenarios.</p>
                         </div>
 
                         <div class="agent-config-section">
@@ -212,12 +235,22 @@ graph TD
                                 <div class="log-placeholder">Awaiting execution...</div>
                             </div>
                         </div>
+
+                        <div class="final-result-section">
+                            <h4><span class="icon">✓</span> Final Result</h4>
+                            <div class="final-result" id="result-group_chat">
+                                <div class="result-placeholder">No result yet. Execute patterns to see the final output.</div>
+                            </div>
+                        </div>
                     </div>
 
-                    <!-- Handoff Panel -->
+                    <!-- Handoff Pattern -->
                     <div class="pattern-panel" id="panel-handoff">
                         <div class="panel-description">
-                            <p>🔀 <strong>Handoff Pattern:</strong> Agents explicitly hand off tasks to each other using HANDOFF markers.</p>
+                            <h3>🔀 Handoff Pattern</h3>
+                            <p><strong>How it works:</strong> The first agent processes the input and can explicitly hand off to specific downstream agents using HANDOFF markers in its output. This creates dynamic, context-dependent routing where the execution path is determined by agent decisions.</p>
+                            <p><strong>Adding agents:</strong> More agents expand the available specialist pool. Each agent can be an expert in a specific domain, and the routing agent(s) can hand off to the most appropriate specialist based on the task requirements.</p>
+                            <p><strong>Best for:</strong> Dynamic routing, context-dependent workflows, specialist coordination, adaptive task delegation.</p>
                         </div>
 
                         <div class="agent-config-section">
@@ -250,17 +283,27 @@ graph LR
                                 <div class="log-placeholder">Awaiting execution...</div>
                             </div>
                         </div>
+
+                        <div class="final-result-section">
+                            <h4><span class="icon">✓</span> Final Result</h4>
+                            <div class="final-result" id="result-handoff">
+                                <div class="result-placeholder">No result yet. Execute patterns to see the final output.</div>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Magentic Panel -->
                     <div class="pattern-panel" id="panel-magentic">
                         <div class="panel-description">
-                            <p>🎯 <strong>Magentic Pattern:</strong> Manager agent breaks down tasks and coordinates worker agents.</p>
+                            <h3>🎯 Magentic Pattern</h3>
+                            <p><strong>How it works:</strong> A manager agent decomposes the input into subtasks, delegates them to worker agents running in parallel, then synthesizes their outputs into a final result. This hierarchical approach combines planning with parallel execution.</p>
+                            <p><strong>Adding agents:</strong> The first agent is always the manager. Each additional agent becomes a worker that can be assigned subtasks. More workers increase the system's capacity for parallel task execution and specialized processing.</p>
+                            <p><strong>Best for:</strong> Complex tasks requiring decomposition, hierarchical planning, parallel subtask execution, divide-and-conquer strategies.</p>
                         </div>
 
                         <div class="agent-config-section">
                             <h4><span class="icon">◈</span> Agent Configuration</h4>
-                            <p class="config-note">Note: First agent is the Manager, others are Workers</p>
+                            <p class="config-note">Note: First agent is the Manager, additional agents are Workers</p>
                             <div class="agent-configs" id="agents-magentic"></div>
                             <button class="btn btn-small cyber-btn add-agent-btn" data-pattern="magentic">
                                 <span class="btn-text">+ ADD AGENT</span>
@@ -295,6 +338,13 @@ graph TD
                             <h4><span class="icon">◉</span> Execution Log</h4>
                             <div class="execution-log" id="log-magentic">
                                 <div class="log-placeholder">Awaiting execution...</div>
+                            </div>
+                        </div>
+
+                        <div class="final-result-section">
+                            <h4><span class="icon">✓</span> Final Result</h4>
+                            <div class="final-result" id="result-magentic">
+                                <div class="result-placeholder">No result yet. Execute patterns to see the final output.</div>
                             </div>
                         </div>
                     </div>

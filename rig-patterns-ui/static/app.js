@@ -184,6 +184,9 @@ function addAgent(pattern, id, provider, model, prompt) {
     });
 
     container.appendChild(clone);
+
+    // Update DAG to reflect new agent
+    renderDAG(pattern);
 }
 
 // ========================================
@@ -508,6 +511,7 @@ function handleExecutionEvent(event) {
                 <div class="log-content"><strong>Output:</strong> ${escapeHtml(event.output)}</div>
             </div>`;
             updatePatternStatus(patternId, 'completed');
+            updateFinalResult(patternId, event.output, 'success');
             break;
 
         case 'pattern_error':
@@ -517,6 +521,7 @@ function handleExecutionEvent(event) {
                 <div class="log-content">${escapeHtml(event.error)}</div>
             </div>`;
             updatePatternStatus(patternId, 'error');
+            updateFinalResult(patternId, event.error, 'error');
             break;
     }
 
@@ -552,6 +557,27 @@ function updatePatternStatus(pattern, status) {
         default:
             badge.textContent = 'READY';
     }
+}
+
+function updateFinalResult(patternId, content, resultType) {
+    const resultContainer = document.getElementById(`result-${patternId}`);
+    if (!resultContainer) {
+        console.warn(`No result container found for pattern: ${patternId}`);
+        return;
+    }
+
+    // Clear placeholder if present
+    resultContainer.innerHTML = '';
+
+    // Create result content div
+    const resultDiv = document.createElement('div');
+    resultDiv.className = `result-content ${resultType}`;
+    resultDiv.textContent = content;
+
+    resultContainer.appendChild(resultDiv);
+
+    // Scroll to the result
+    resultContainer.scrollTop = 0;
 }
 
 function updateWebSocketStatus(status) {
