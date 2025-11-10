@@ -78,39 +78,63 @@ async fn execute_with_streaming(
 ) -> anyhow::Result<()> {
     use crate::state::PatternConfig;
 
-    // Simulate execution with streaming events
+    // Simulate execution with detailed streaming events
     match &request.pattern {
         PatternConfig::Sequential => {
+            let mut current_input = request.input.clone();
+
             for (idx, agent) in request.agents.iter().enumerate() {
-                // Agent start
+                // Agent receives input
                 send_event(
                     sender,
-                    ExecutionEvent::AgentStart {
+                    ExecutionEvent::AgentReceivesInput {
+                        agent_id: agent.id.clone(),
+                        input: current_input.clone(),
+                        timestamp: chrono::Utc::now().to_rfc3339(),
+                    },
+                )
+                .await?;
+
+                tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
+
+                // Agent thinking
+                send_event(
+                    sender,
+                    ExecutionEvent::AgentThinking {
                         agent_id: agent.id.clone(),
                         timestamp: chrono::Utc::now().to_rfc3339(),
                     },
                 )
                 .await?;
 
-                // Simulate processing delay
-                tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+                tokio::time::sleep(tokio::time::Duration::from_millis(700)).await;
 
-                // Agent complete
+                // Agent responds
+                let response = format!(
+                    "Processed by {}: Enhanced and refined the input with my expertise in {}. Ready for next stage.",
+                    agent.id,
+                    agent.system_prompt.split_whitespace().take(5).collect::<Vec<_>>().join(" ")
+                );
+
                 send_event(
                     sender,
-                    ExecutionEvent::AgentComplete {
+                    ExecutionEvent::AgentResponds {
                         agent_id: agent.id.clone(),
-                        output_preview: format!("Output from {} (step {})", agent.id, idx + 1),
+                        response: response.clone(),
                         timestamp: chrono::Utc::now().to_rfc3339(),
                     },
                 )
                 .await?;
+
+                current_input = response;
+
+                tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
             }
 
             send_event(
                 sender,
                 ExecutionEvent::PatternComplete {
-                    output: "Sequential execution complete".to_string(),
+                    output: current_input,
                     metadata: serde_json::json!({
                         "pattern": "sequential",
                         "steps": request.agents.len(),
@@ -121,12 +145,27 @@ async fn execute_with_streaming(
             .await?;
         }
 
-        PatternConfig::Concurrent { .. } => {
-            // Start all agents concurrently
+        PatternConfig::Concurrent { aggregation } => {
+            // All agents receive the same input
             for agent in &request.agents {
                 send_event(
                     sender,
-                    ExecutionEvent::AgentStart {
+                    ExecutionEvent::AgentReceivesInput {
+                        agent_id: agent.id.clone(),
+                        input: request.input.clone(),
+                        timestamp: chrono::Utc::now().to_rfc3339(),
+                    },
+                )
+                .await?;
+            }
+
+            tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
+
+            // All thinking concurrently
+            for agent in &request.agents {
+                send_event(
+                    sender,
+                    ExecutionEvent::AgentThinking {
                         agent_id: agent.id.clone(),
                         timestamp: chrono::Utc::now().to_rfc3339(),
                     },
@@ -134,26 +173,33 @@ async fn execute_with_streaming(
                 .await?;
             }
 
-            // Simulate concurrent execution
             tokio::time::sleep(tokio::time::Duration::from_millis(800)).await;
 
-            // All complete
+            // All respond
             for agent in &request.agents {
+                let response = format!(
+                    "From {}'s perspective: I analyzed this from my specialized viewpoint. My findings suggest: [detailed analysis based on {}]",
+                    agent.id,
+                    agent.system_prompt.split_whitespace().take(4).collect::<Vec<_>>().join(" ")
+                );
+
                 send_event(
                     sender,
-                    ExecutionEvent::AgentComplete {
+                    ExecutionEvent::AgentResponds {
                         agent_id: agent.id.clone(),
-                        output_preview: format!("Concurrent output from {}", agent.id),
+                        response,
                         timestamp: chrono::Utc::now().to_rfc3339(),
                     },
                 )
                 .await?;
+
+                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
             }
 
             send_event(
                 sender,
                 ExecutionEvent::PatternStep {
-                    message: "Aggregating results...".to_string(),
+                    message: format!("Aggregating results using {:?} strategy...", aggregation),
                     timestamp: chrono::Utc::now().to_rfc3339(),
                 },
             )
@@ -164,10 +210,11 @@ async fn execute_with_streaming(
             send_event(
                 sender,
                 ExecutionEvent::PatternComplete {
-                    output: "Concurrent execution complete".to_string(),
+                    output: format!("Combined insights from {} agents using {:?} aggregation", request.agents.len(), aggregation),
                     metadata: serde_json::json!({
                         "pattern": "concurrent",
                         "agents": request.agents.len(),
+                        "aggregation": format!("{:?}", aggregation),
                     }),
                     timestamp: chrono::Utc::now().to_rfc3339(),
                 },
@@ -177,48 +224,80 @@ async fn execute_with_streaming(
 
         PatternConfig::GroupChat { max_rounds } => {
             let rounds = (*max_rounds).min(3);
+            let mut conversation_history = request.input.clone();
 
             for round in 1..=rounds {
                 send_event(
                     sender,
                     ExecutionEvent::PatternStep {
-                        message: format!("Round {} of {}", round, rounds),
+                        message: format!("🔄 Discussion Round {} of {}", round, rounds),
                         timestamp: chrono::Utc::now().to_rfc3339(),
                     },
                 )
                 .await?;
 
+                tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+
                 for agent in &request.agents {
+                    // Agent receives conversation history
                     send_event(
                         sender,
-                        ExecutionEvent::AgentStart {
+                        ExecutionEvent::AgentReceivesInput {
+                            agent_id: agent.id.clone(),
+                            input: conversation_history.clone(),
+                            timestamp: chrono::Utc::now().to_rfc3339(),
+                        },
+                    )
+                    .await?;
+
+                    tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+
+                    send_event(
+                        sender,
+                        ExecutionEvent::AgentThinking {
                             agent_id: agent.id.clone(),
                             timestamp: chrono::Utc::now().to_rfc3339(),
                         },
                     )
                     .await?;
 
-                    tokio::time::sleep(tokio::time::Duration::from_millis(400)).await;
+                    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+
+                    let response = if round == rounds {
+                        format!("{}: I agree with the direction we've reached. This looks good! CONSENSUS_REACHED", agent.id)
+                    } else {
+                        format!(
+                            "{}: Here's my take - {}. What do others think?",
+                            agent.id,
+                            agent.system_prompt.split_whitespace().take(6).collect::<Vec<_>>().join(" ")
+                        )
+                    };
 
                     send_event(
                         sender,
-                        ExecutionEvent::AgentComplete {
-                            agent_id: agent.id.clone(),
-                            output_preview: format!("{} speaks in round {}", agent.id, round),
+                        ExecutionEvent::ConversationMessage {
+                            from: agent.id.clone(),
+                            message: response.clone(),
+                            message_type: if round == rounds { "consensus".to_string() } else { "output".to_string() },
                             timestamp: chrono::Utc::now().to_rfc3339(),
                         },
                     )
                     .await?;
+
+                    conversation_history.push_str(&format!("\n{}", response));
+
+                    tokio::time::sleep(tokio::time::Duration::from_millis(150)).await;
                 }
             }
 
             send_event(
                 sender,
                 ExecutionEvent::PatternComplete {
-                    output: format!("Group chat complete after {} rounds", rounds),
+                    output: format!("Group consensus reached after {} rounds", rounds),
                     metadata: serde_json::json!({
                         "pattern": "group_chat",
                         "rounds": rounds,
+                        "participants": request.agents.len(),
                     }),
                     timestamp: chrono::Utc::now().to_rfc3339(),
                 },
@@ -228,49 +307,74 @@ async fn execute_with_streaming(
 
         PatternConfig::Handoff { .. } => {
             let hops = request.agents.len().min(3);
+            let mut current_input = request.input.clone();
 
             for (idx, agent) in request.agents.iter().take(hops).enumerate() {
                 send_event(
                     sender,
-                    ExecutionEvent::AgentStart {
+                    ExecutionEvent::AgentReceivesInput {
+                        agent_id: agent.id.clone(),
+                        input: current_input.clone(),
+                        timestamp: chrono::Utc::now().to_rfc3339(),
+                    },
+                )
+                .await?;
+
+                tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
+
+                send_event(
+                    sender,
+                    ExecutionEvent::AgentThinking {
                         agent_id: agent.id.clone(),
                         timestamp: chrono::Utc::now().to_rfc3339(),
                     },
                 )
                 .await?;
 
-                tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+                tokio::time::sleep(tokio::time::Duration::from_millis(600)).await;
 
                 if idx < hops - 1 {
+                    let next_agent = &request.agents[idx + 1];
+                    let handoff_msg = format!(
+                        "I've handled the {} part. Handing off to {} for specialized {}",
+                        agent.system_prompt.split_whitespace().take(3).collect::<Vec<_>>().join(" "),
+                        next_agent.id,
+                        next_agent.system_prompt.split_whitespace().take(3).collect::<Vec<_>>().join(" ")
+                    );
+
                     send_event(
                         sender,
-                        ExecutionEvent::PatternStep {
-                            message: format!(
-                                "{} → {} (handoff)",
-                                agent.id,
-                                request.agents[idx + 1].id
-                            ),
+                        ExecutionEvent::AgentHandoff {
+                            from_agent: agent.id.clone(),
+                            to_agent: next_agent.id.clone(),
+                            message: handoff_msg.clone(),
                             timestamp: chrono::Utc::now().to_rfc3339(),
                         },
                     )
                     .await?;
+
+                    current_input = handoff_msg;
                 } else {
+                    let response = format!("{}: Task completed successfully. Final result ready.", agent.id);
                     send_event(
                         sender,
-                        ExecutionEvent::AgentComplete {
+                        ExecutionEvent::AgentResponds {
                             agent_id: agent.id.clone(),
-                            output_preview: format!("{} handled the task", agent.id),
+                            response: response.clone(),
                             timestamp: chrono::Utc::now().to_rfc3339(),
                         },
                     )
                     .await?;
+                    current_input = response;
                 }
+
+                tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
             }
 
             send_event(
                 sender,
                 ExecutionEvent::PatternComplete {
-                    output: "Handoff complete".to_string(),
+                    output: current_input,
                     metadata: serde_json::json!({
                         "pattern": "handoff",
                         "hops": hops,
@@ -283,10 +387,24 @@ async fn execute_with_streaming(
 
         PatternConfig::Magentic { .. } => {
             // Manager creates tasks
+            let manager_id = &request.agents[0].id;
+
             send_event(
                 sender,
-                ExecutionEvent::PatternStep {
-                    message: "Manager creating task list...".to_string(),
+                ExecutionEvent::AgentReceivesInput {
+                    agent_id: manager_id.clone(),
+                    input: request.input.clone(),
+                    timestamp: chrono::Utc::now().to_rfc3339(),
+                },
+            )
+            .await?;
+
+            tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
+
+            send_event(
+                sender,
+                ExecutionEvent::AgentThinking {
+                    agent_id: manager_id.clone(),
                     timestamp: chrono::Utc::now().to_rfc3339(),
                 },
             )
@@ -294,34 +412,78 @@ async fn execute_with_streaming(
 
             tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
-            let tasks = vec!["Task 1", "Task 2", "Task 3"];
+            let tasks = vec![
+                "Analyze core requirements",
+                "Research relevant approaches",
+                "Synthesize findings"
+            ];
 
-            for task in tasks {
+            send_event(
+                sender,
+                ExecutionEvent::AgentResponds {
+                    agent_id: manager_id.clone(),
+                    response: format!("Task breakdown: {}", tasks.join(", ")),
+                    timestamp: chrono::Utc::now().to_rfc3339(),
+                },
+            )
+            .await?;
+
+            tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+
+            for task in &tasks {
                 send_event(
                     sender,
                     ExecutionEvent::PatternStep {
-                        message: format!("Working on: {}", task),
+                        message: format!("📋 Assigning: {}", task),
                         timestamp: chrono::Utc::now().to_rfc3339(),
                     },
                 )
                 .await?;
 
-                tokio::time::sleep(tokio::time::Duration::from_millis(400)).await;
+                if request.agents.len() > 1 {
+                    let worker = &request.agents[1];
 
-                send_event(
-                    sender,
-                    ExecutionEvent::PatternStep {
-                        message: format!("Completed: {}", task),
-                        timestamp: chrono::Utc::now().to_rfc3339(),
-                    },
-                )
-                .await?;
+                    send_event(
+                        sender,
+                        ExecutionEvent::AgentReceivesInput {
+                            agent_id: worker.id.clone(),
+                            input: task.to_string(),
+                            timestamp: chrono::Utc::now().to_rfc3339(),
+                        },
+                    )
+                    .await?;
+
+                    tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
+
+                    send_event(
+                        sender,
+                        ExecutionEvent::AgentThinking {
+                            agent_id: worker.id.clone(),
+                            timestamp: chrono::Utc::now().to_rfc3339(),
+                        },
+                    )
+                    .await?;
+
+                    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+
+                    send_event(
+                        sender,
+                        ExecutionEvent::AgentResponds {
+                            agent_id: worker.id.clone(),
+                            response: format!("Completed: {} ✓", task),
+                            timestamp: chrono::Utc::now().to_rfc3339(),
+                        },
+                    )
+                    .await?;
+                }
+
+                tokio::time::sleep(tokio::time::Duration::from_millis(150)).await;
             }
 
             send_event(
                 sender,
                 ExecutionEvent::PatternStep {
-                    message: "Manager synthesizing results...".to_string(),
+                    message: "Manager synthesizing all results...".to_string(),
                     timestamp: chrono::Utc::now().to_rfc3339(),
                 },
             )
@@ -332,10 +494,10 @@ async fn execute_with_streaming(
             send_event(
                 sender,
                 ExecutionEvent::PatternComplete {
-                    output: "Magentic orchestration complete".to_string(),
+                    output: format!("All {} tasks completed and synthesized", tasks.len()),
                     metadata: serde_json::json!({
                         "pattern": "magentic",
-                        "tasks_completed": 3,
+                        "tasks_completed": tasks.len(),
                     }),
                     timestamp: chrono::Utc::now().to_rfc3339(),
                 },

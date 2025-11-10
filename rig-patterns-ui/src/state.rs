@@ -76,6 +76,20 @@ pub enum ExecutionEvent {
         agent_id: String,
         timestamp: String,
     },
+    AgentReceivesInput {
+        agent_id: String,
+        input: String,
+        timestamp: String,
+    },
+    AgentThinking {
+        agent_id: String,
+        timestamp: String,
+    },
+    AgentResponds {
+        agent_id: String,
+        response: String,
+        timestamp: String,
+    },
     AgentComplete {
         agent_id: String,
         output_preview: String,
@@ -86,8 +100,20 @@ pub enum ExecutionEvent {
         error: String,
         timestamp: String,
     },
+    AgentHandoff {
+        from_agent: String,
+        to_agent: String,
+        message: String,
+        timestamp: String,
+    },
     PatternStep {
         message: String,
+        timestamp: String,
+    },
+    ConversationMessage {
+        from: String,
+        message: String,
+        message_type: String, // "input", "output", "handoff", "consensus"
         timestamp: String,
     },
     PatternComplete {
