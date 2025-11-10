@@ -37,7 +37,23 @@ impl From<PatternConfig> for Pattern {
     }
 }
 
-/// Request to execute a pattern
+/// Configuration for a single pattern execution
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PatternExecutionConfig {
+    pub pattern: PatternConfig,
+    pub agents: Vec<AgentConfig>,
+}
+
+/// Request to compare all patterns (executes all in parallel)
+#[derive(Debug, Deserialize)]
+pub struct CompareRequest {
+    /// The root input prompt that all patterns will process
+    pub input: String,
+    /// Configuration for each pattern (if not provided, uses default agents for all)
+    pub pattern_configs: Option<std::collections::HashMap<String, PatternExecutionConfig>>,
+}
+
+/// Unified execution request for backward compatibility and single pattern execution
 #[derive(Debug, Deserialize)]
 pub struct ExecuteRequest {
     pub agents: Vec<AgentConfig>,
@@ -55,13 +71,6 @@ pub struct ExecuteResponse {
     pub duration_ms: u128,
 }
 
-/// Request to compare all patterns
-#[derive(Debug, Deserialize)]
-pub struct CompareRequest {
-    pub agents: Vec<AgentConfig>,
-    pub input: String,
-}
-
 /// Response with all pattern results
 #[derive(Debug, Serialize)]
 pub struct CompareResponse {
@@ -74,57 +83,76 @@ pub struct CompareResponse {
 pub enum ExecutionEvent {
     #[allow(dead_code)]
     AgentStart {
+        pattern_id: String,
         agent_id: String,
+        provider: String,
         timestamp: String,
     },
     AgentReceivesInput {
+        pattern_id: String,
         agent_id: String,
+        provider: String,
         input: String,
         timestamp: String,
     },
     AgentThinking {
+        pattern_id: String,
         agent_id: String,
+        provider: String,
         timestamp: String,
     },
     AgentResponds {
+        pattern_id: String,
         agent_id: String,
+        provider: String,
         response: String,
         timestamp: String,
     },
     #[allow(dead_code)]
     AgentComplete {
+        pattern_id: String,
         agent_id: String,
+        provider: String,
         output_preview: String,
         timestamp: String,
     },
     #[allow(dead_code)]
     AgentError {
+        pattern_id: String,
         agent_id: String,
         error: String,
         timestamp: String,
     },
     AgentHandoff {
+        pattern_id: String,
         from_agent: String,
         to_agent: String,
+        from_provider: String,
+        to_provider: String,
         message: String,
         timestamp: String,
     },
     PatternStep {
+        pattern_id: String,
         message: String,
         timestamp: String,
     },
     ConversationMessage {
+        pattern_id: String,
         from: String,
+        provider: String,
         message: String,
         message_type: String, // "input", "output", "handoff", "consensus"
         timestamp: String,
     },
     PatternComplete {
+        pattern_id: String,
         output: String,
         metadata: serde_json::Value,
         timestamp: String,
     },
     PatternError {
+        pattern_id: String,
         error: String,
         timestamp: String,
     },

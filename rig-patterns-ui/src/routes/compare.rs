@@ -1,18 +1,27 @@
-//! Pattern comparison endpoint
+//! Pattern comparison endpoint (deprecated - use WebSocket for real-time comparison)
 
-use crate::state::{CompareRequest, CompareResponse, ExecuteRequest, PatternConfig};
+use crate::state::{AgentConfig, CompareResponse, ExecuteRequest, PatternConfig};
 use axum::{extract::State as AxumState, http::StatusCode, Json};
 use rig_patterns::Aggregation;
+use serde::Deserialize;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+/// Deprecated compare request structure for REST API
+#[derive(Debug, Deserialize)]
+pub struct LegacyCompareRequest {
+    pub agents: Vec<AgentConfig>,
+    pub input: String,
+}
+
 /// Compare all patterns with the same agents and input
+/// Note: This REST endpoint is deprecated. Use WebSocket with CompareRequest for real-time updates.
 pub async fn compare_patterns(
     state: AxumState<Arc<crate::state::AppState>>,
-    Json(request): Json<CompareRequest>,
+    Json(request): Json<LegacyCompareRequest>,
 ) -> Result<Json<CompareResponse>, (StatusCode, String)> {
     tracing::info!(
-        "Comparing all patterns with {} agents",
+        "Comparing all patterns with {} agents (using legacy REST API)",
         request.agents.len()
     );
 
