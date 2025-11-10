@@ -45,13 +45,13 @@ run.bat
 2. ✅ **Pulls Latest** - Gets the latest code from git
 3. ✅ **Builds Library** - Compiles `rig-patterns` in release mode
 4. ✅ **Builds UI** - Compiles `rig-patterns-ui` in release mode
-5. ✅ **Launches Server** - Starts the web server at http://localhost:3000
+5. ✅ **Launches Server** - Starts the web server at http://localhost:3009
 
 ## Using the UI
 
 Once the server starts:
 
-1. **Open Browser** → http://localhost:3000
+1. **Open Browser** → http://localhost:3009
 2. **See 5 Tabs** → Sequential, Concurrent, Group Chat, Handoff, Magentic
 3. **View DAGs** → Each tab shows the expected execution flow
 4. **Configure Agents** → Edit agents per pattern (or use defaults)
@@ -161,12 +161,12 @@ xcode-select --install
 Install Visual Studio Build Tools from:
 https://visualstudio.microsoft.com/downloads/
 
-### Browser Error: "Cannot connect to localhost:3000"
+### Browser Error: "Cannot connect to localhost:3009"
 
 1. Check if server is running (should see logs in terminal)
-2. Try: http://127.0.0.1:3000 instead
-3. Check firewall isn't blocking port 3000
-4. Make sure no other service is using port 3000
+2. Try: http://127.0.0.1:3009 instead
+3. Check firewall isn't blocking port 3009
+4. Make sure no other service is using port 3009
 
 ### WebSocket Error: "Connection failed"
 

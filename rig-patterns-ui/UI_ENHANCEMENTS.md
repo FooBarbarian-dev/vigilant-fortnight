@@ -151,7 +151,7 @@ Each pattern tab now includes detailed documentation explaining:
    cd rig-patterns-ui && cargo run --release
    ```
 
-2. **Open browser**: Navigate to `http://localhost:3000`
+2. **Open browser**: Navigate to `http://localhost:3009`
 
 3. **Test DAG Rendering**:
    - Switch to any tab

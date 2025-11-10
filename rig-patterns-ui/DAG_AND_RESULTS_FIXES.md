@@ -389,7 +389,7 @@ Object.keys(state.patterns).forEach(pattern => {
    cd rig-patterns-ui && cargo run --release
    ```
 
-2. **Open browser**: `http://localhost:3000`
+2. **Open browser**: `http://localhost:3009`
 
 3. **Test DAGs**:
    - Switch to each tab and verify DAG displays correctly

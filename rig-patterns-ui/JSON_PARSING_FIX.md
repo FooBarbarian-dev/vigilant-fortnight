@@ -85,7 +85,7 @@ cd rig-patterns-ui
 cargo run --release
 ```
 
-Then open browser to `http://localhost:3000` and try executing all patterns.
+Then open browser to `http://localhost:3009` and try executing all patterns.
 
 ## Expected Behavior Now
 
@@ -107,7 +107,7 @@ Then open browser to `http://localhost:3000` and try executing all patterns.
 The fix is complete and committed. To verify everything works:
 
 1. Start the server: `./run.sh` or `cd rig-patterns-ui && cargo run --release`
-2. Open browser to `http://localhost:3000`
+2. Open browser to `http://localhost:3009`
 3. Fill in a prompt like "Explain quantum computing"
 4. Click "Execute All Patterns"
 5. Verify all 5 tabs show execution progress with DAGs updating

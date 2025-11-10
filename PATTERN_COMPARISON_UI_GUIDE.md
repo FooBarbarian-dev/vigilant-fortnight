@@ -23,7 +23,7 @@ cd rig-patterns-ui
 cargo run --release
 ```
 
-Navigate to `http://localhost:3000`
+Navigate to `http://localhost:3009`
 
 ### 2. Configure Agents Per Pattern
 

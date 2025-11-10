@@ -132,15 +132,16 @@ echo ============================================
 echo   RIG-PATTERNS PATTERN COMPARISON UI
 echo ============================================
 echo.
-echo Server will start at: http://localhost:3000
+echo Server will start at: http://localhost:3009
 echo.
 echo To use the UI:
-echo   1. Open http://localhost:3000 in your browser
+echo   1. Open http://localhost:3009 in your browser
 echo   2. Configure agents in each pattern tab
 echo   3. Enter a root prompt
 echo   4. Click 'Execute All Patterns'
 echo   5. Watch the tabs for real-time execution
 echo.
+echo To use a different port: set PORT=8080 ^&^& run.bat
 echo Press Ctrl+C to stop the server
 echo.
 

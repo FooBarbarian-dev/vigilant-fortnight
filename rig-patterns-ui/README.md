@@ -38,15 +38,24 @@ Each orchestration pattern has a distinct, real-time visualization:
 # From the repository root
 cd rig-patterns-ui
 
-# Run the server (builds and starts on http://localhost:3000)
+# Run the server (builds and starts on http://localhost:3009)
 cargo run
 
 # Or build for release
 cargo build --release
 ./target/release/rig-patterns-ui
+
+# To use a different port
+PORT=8080 cargo run
 ```
 
-The server will start on `http://localhost:3000`. Open this URL in your browser.
+The server will start on `http://localhost:3009` by default. Open this URL in your browser.
+
+**Changing the port:** Set the `PORT` environment variable before running:
+```bash
+PORT=8080 cargo run          # Use port 8080
+PORT=3000 cargo run          # Use port 3000
+```
 
 ### First-Time Usage
 
@@ -354,7 +363,7 @@ export OPENAI_API_KEY="sk-..."
 # Run the server
 cargo run
 
-# Open http://localhost:3000
+# Open http://localhost:3009
 # Agents will now make real LLM calls!
 ```
 
@@ -428,4 +437,4 @@ Built with:
 
 ---
 
-**Ready to explore?** Run `cargo run` and open http://localhost:3000 🚀
+**Ready to explore?** Run `cargo run` and open http://localhost:3009 🚀

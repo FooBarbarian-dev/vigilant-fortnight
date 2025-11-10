@@ -297,7 +297,7 @@ You can test the parallel execution now:
 
 ```javascript
 // In browser console or via WebSocket client
-const ws = new WebSocket('ws://localhost:3000/ws');
+const ws = new WebSocket('ws://localhost:3009/ws');
 
 ws.onopen = () => {
   ws.send(JSON.stringify({

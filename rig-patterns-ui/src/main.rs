@@ -54,9 +54,15 @@ async fn main() {
         .layer(TraceLayer::new_for_http());
 
     // Start server
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
+    let port = std::env::var("PORT")
+        .unwrap_or_else(|_| "3009".to_string())
+        .parse::<u16>()
+        .unwrap_or(3009);
+
+    let addr = SocketAddr::from(([127, 0, 0, 1], port));
     tracing::info!("Server listening on http://{}", addr);
-    tracing::info!("Open http://localhost:3000 in your browser");
+    tracing::info!("Open http://localhost:{} in your browser", port);
+    tracing::info!("To change port: Set PORT environment variable (e.g., PORT=8080 cargo run)");
 
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();
