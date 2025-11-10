@@ -321,11 +321,19 @@ async function executePattern() {
 }
 
 async function executeWithStreaming() {
+    console.log('========== EXECUTION START ==========');
     console.log('Executing with streaming...');
 
     updateState();
 
     const input = document.getElementById('user-input').value.trim();
+
+    console.log('Input:', input);
+    console.log('Current state:', {
+        agents: state.agents.length,
+        pattern: state.pattern,
+        patternOptions: state.patternOptions
+    });
 
     if (!input) {
         alert('Please enter an input prompt');
@@ -347,34 +355,42 @@ async function executeWithStreaming() {
     state.ws = ws;
 
     ws.onopen = () => {
-        console.log('WebSocket connected');
+        console.log('✅ WebSocket connected successfully');
         updateWebSocketStatus('connected');
 
         // Initialize visualization for pattern
         initializeStreamingVisualization(state.pattern);
 
-        // Send execution request
-        ws.send(JSON.stringify({
+        const request = {
             agents: state.agents,
             pattern: state.patternOptions,
             input: input,
-        }));
+        };
+
+        console.log('📤 Sending execution request:', request);
+        console.log('  → Agents:', state.agents.map(a => `${a.id}(${a.provider}:${a.model})`).join(', '));
+        console.log('  → Pattern:', state.patternOptions);
+        console.log('  → Input:', input);
+
+        // Send execution request
+        ws.send(JSON.stringify(request));
     };
 
     ws.onmessage = (event) => {
         const message = JSON.parse(event.data);
-        console.log('WebSocket message:', message);
+        console.log('📥 WebSocket message received:', message.type, message);
         handleStreamingEvent(message);
     };
 
     ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
+        console.error('❌ WebSocket error:', error);
         updateWebSocketStatus('error');
         alert('WebSocket connection failed');
     };
 
     ws.onclose = () => {
-        console.log('WebSocket closed');
+        console.log('🔌 WebSocket closed');
+        console.log('========== EXECUTION END ==========');
         updateWebSocketStatus('disconnected');
         state.ws = null;
     };
@@ -539,7 +555,7 @@ function initializeStreamingVisualization(patternType) {
 }
 
 function handleStreamingEvent(event) {
-    console.log('Streaming event:', event.type);
+    console.log(`🔔 Handling event: ${event.type}`, event);
 
     switch (event.type) {
         case 'agent_start':

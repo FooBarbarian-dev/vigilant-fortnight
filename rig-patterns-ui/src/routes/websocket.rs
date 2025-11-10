@@ -21,6 +21,7 @@ pub async fn ws_handler(
 
 /// Handle WebSocket connection
 async fn handle_socket(socket: WebSocket, _state: AxumState<Arc<crate::state::AppState>>) {
+    tracing::info!("WebSocket connection established");
     let (mut sender, mut receiver) = socket.split();
 
     // Listen for execution requests
@@ -28,18 +29,26 @@ async fn handle_socket(socket: WebSocket, _state: AxumState<Arc<crate::state::Ap
         let msg = if let Ok(msg) = msg {
             msg
         } else {
-            // Client disconnected
+            tracing::warn!("Client disconnected during message receive");
             return;
         };
 
         if let Message::Text(text) = msg {
+            tracing::debug!("Received WebSocket message: {} bytes", text.len());
+
             // Parse the execute request
             match serde_json::from_str::<ExecuteRequest>(&text) {
                 Ok(request) => {
                     tracing::info!(
-                        "WebSocket: Executing pattern {:?} with {} agents",
+                        "========== WEBSOCKET EXECUTION START ==========\n\
+                         Pattern: {:?}\n\
+                         Agents: {}\n\
+                         Input: {}\n\
+                         Agent details: {:?}",
                         request.pattern,
-                        request.agents.len()
+                        request.agents.len(),
+                        request.input,
+                        request.agents.iter().map(|a| format!("{}({}:{})", a.id, a.provider, a.model)).collect::<Vec<_>>()
                     );
 
                     // Execute with streaming events
@@ -54,9 +63,11 @@ async fn handle_socket(socket: WebSocket, _state: AxumState<Arc<crate::state::Ap
                         )
                         .await;
                     }
+
+                    tracing::info!("========== WEBSOCKET EXECUTION COMPLETE ==========");
                 }
                 Err(e) => {
-                    tracing::error!("Failed to parse execute request: {}", e);
+                    tracing::error!("Failed to parse execute request: {} - Raw text: {}", e, &text[..text.len().min(200)]);
                     let _ = send_event(
                         &mut sender,
                         ExecutionEvent::PatternError {
@@ -69,22 +80,44 @@ async fn handle_socket(socket: WebSocket, _state: AxumState<Arc<crate::state::Ap
             }
         }
     }
+
+    tracing::info!("WebSocket connection closed");
 }
 
 /// Execute pattern with streaming events
+/// NOTE: This is MOCK/SIMULATED execution for demonstration purposes!
+/// Real LLM API calls would be made in a production version.
 async fn execute_with_streaming(
     sender: &mut futures::stream::SplitSink<WebSocket, Message>,
     request: ExecuteRequest,
 ) -> anyhow::Result<()> {
     use crate::state::PatternConfig;
 
+    tracing::warn!("⚠️  MOCK EXECUTION - This is simulated for demo purposes, not calling real LLM APIs");
+
+    // Send a notification that this is mock execution
+    send_event(
+        sender,
+        ExecutionEvent::PatternStep {
+            message: "⚠️  DEMO MODE: Simulating LLM responses (not calling real APIs)".to_string(),
+            timestamp: chrono::Utc::now().to_rfc3339(),
+        },
+    )
+    .await?;
+
+    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+
     // Simulate execution with detailed streaming events
     match &request.pattern {
         PatternConfig::Sequential => {
+            tracing::info!("Starting SEQUENTIAL pattern with {} agents", request.agents.len());
             let mut current_input = request.input.clone();
 
             for (idx, agent) in request.agents.iter().enumerate() {
+                tracing::info!("[Sequential Step {}/{}] Agent: {}", idx + 1, request.agents.len(), agent.id);
+
                 // Agent receives input
+                tracing::debug!("  → Agent {} receives input: {}...", agent.id, &current_input[..current_input.len().min(80)]);
                 send_event(
                     sender,
                     ExecutionEvent::AgentReceivesInput {
@@ -98,6 +131,7 @@ async fn execute_with_streaming(
                 tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
 
                 // Agent thinking
+                tracing::debug!("  → Agent {} is thinking...", agent.id);
                 send_event(
                     sender,
                     ExecutionEvent::AgentThinking {
@@ -116,6 +150,7 @@ async fn execute_with_streaming(
                     agent.system_prompt.split_whitespace().take(5).collect::<Vec<_>>().join(" ")
                 );
 
+                tracing::debug!("  → Agent {} responds: {}...", agent.id, &response[..response.len().min(80)]);
                 send_event(
                     sender,
                     ExecutionEvent::AgentResponds {
@@ -130,6 +165,8 @@ async fn execute_with_streaming(
 
                 tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
             }
+
+            tracing::info!("Sequential pattern completed");
 
             send_event(
                 sender,
@@ -514,6 +551,23 @@ async fn send_event(
     sender: &mut futures::stream::SplitSink<WebSocket, Message>,
     event: ExecutionEvent,
 ) -> anyhow::Result<()> {
+    // Log event being sent
+    let event_type = match &event {
+        ExecutionEvent::AgentStart { agent_id, .. } => format!("AgentStart({})", agent_id),
+        ExecutionEvent::AgentReceivesInput { agent_id, input, .. } => format!("AgentReceivesInput({}, {}...)", agent_id, &input[..input.len().min(50)]),
+        ExecutionEvent::AgentThinking { agent_id, .. } => format!("AgentThinking({})", agent_id),
+        ExecutionEvent::AgentResponds { agent_id, response, .. } => format!("AgentResponds({}, {}...)", agent_id, &response[..response.len().min(50)]),
+        ExecutionEvent::AgentComplete { agent_id, .. } => format!("AgentComplete({})", agent_id),
+        ExecutionEvent::AgentError { agent_id, error, .. } => format!("AgentError({}, {})", agent_id, error),
+        ExecutionEvent::AgentHandoff { from_agent, to_agent, .. } => format!("AgentHandoff({} -> {})", from_agent, to_agent),
+        ExecutionEvent::PatternStep { message, .. } => format!("PatternStep({})", message),
+        ExecutionEvent::ConversationMessage { from, .. } => format!("ConversationMessage({})", from),
+        ExecutionEvent::PatternComplete { .. } => "PatternComplete".to_string(),
+        ExecutionEvent::PatternError { error, .. } => format!("PatternError({})", error),
+    };
+
+    tracing::debug!("→ Sending event: {}", event_type);
+
     let json = serde_json::to_string(&event)?;
     sender.send(Message::Text(json)).await?;
     Ok(())
