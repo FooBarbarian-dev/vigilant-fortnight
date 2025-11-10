@@ -43,8 +43,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Set up event listeners
     setupEventListeners();
 
-    // Render initial DAGs
-    renderAllDAGs();
+    // Render initial DAG only for active panel
+    renderDAG('sequential');
 
     console.log('✅ Initialization complete!');
 });
@@ -124,6 +124,9 @@ function switchToPattern(pattern) {
             panel.classList.add('active');
         }
     });
+
+    // Render DAG for the newly active pattern
+    renderDAG(pattern);
 
     console.log(`Switched to ${pattern} pattern`);
 }

@@ -92,14 +92,14 @@ body {
     background: var(--bg-darker);
     border-bottom: 2px solid var(--neon-cyan);
     box-shadow: 0 4px 20px rgba(0, 255, 255, 0.3);
-    padding: 1.5rem 2rem;
+    padding: 1rem 1.5rem;
     position: sticky;
     top: 0;
     z-index: 100;
 }
 
 .header-content {
-    max-width: 1800px;
+    max-width: 2400px;
     margin: 0 auto;
     display: flex;
     justify-content: space-between;
@@ -179,13 +179,13 @@ body {
 /* === MAIN CONTENT === */
 .main-content {
     flex: 1;
-    max-width: 1800px;
+    max-width: 2400px;
     width: 100%;
-    margin: 2rem auto;
-    padding: 0 2rem;
-    display: grid;
-    grid-template-columns: 300px 1fr 350px;
-    gap: 2rem;
+    margin: 0.5rem auto;
+    padding: 0 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
 }
 
 /* === CYBER PANELS === */
@@ -818,14 +818,13 @@ body {
 /* === RESPONSIVE === */
 @media (max-width: 1400px) {
     .main-content {
-        grid-template-columns: 280px 1fr 320px;
+        max-width: 100%;
         gap: 1.5rem;
     }
 }
 
 @media (max-width: 1200px) {
     .main-content {
-        grid-template-columns: 1fr;
         gap: 1.5rem;
     }
 
@@ -843,6 +842,7 @@ body {
     .main-content {
         padding: 0 1rem;
         gap: 1rem;
+        margin: 0.5rem auto;
     }
 
     .header-content {
