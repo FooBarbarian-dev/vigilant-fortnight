@@ -178,7 +178,7 @@ function addAgent(pattern, id, provider, model, prompt) {
 
         // Only auto-update if current model doesn't match provider
         if (provider === 'anthropic' && currentModel.startsWith('gpt-')) {
-            modelInput.value = 'claude-3-5-sonnet-20241022';
+            modelInput.value = 'claude-3-5-sonnet-20240620';
         } else if (provider === 'openai' && currentModel.startsWith('claude-')) {
             modelInput.value = 'gpt-4';
         } else if (provider === 'cohere' && !currentModel.startsWith('command-')) {

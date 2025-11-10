@@ -416,9 +416,10 @@ where
                     timestamp: chrono::Utc::now().to_rfc3339(),
                 }).await?;
 
-                for agent in &agents {
+                for (idx, agent) in agents.iter().enumerate() {
                     let agent_id = agent.id();
                     let provider = get_provider(agent_id);
+                    let is_last_agent = idx == agents.len() - 1;
 
                     sender.send(ExecutionEvent::AgentReceivesInput {
                         pattern_id: pattern_id.clone(),
@@ -436,7 +437,12 @@ where
                     }).await?;
 
                     // *** REAL LLM CALL WITH TIMEOUT ***
-                    let prompt = format!("{}\n\nRespond to the discussion. Include CONSENSUS_REACHED in your response if you believe we've reached a good conclusion.", conversation_history);
+                    // Only the last agent can trigger consensus to ensure all agents participate
+                    let prompt = if is_last_agent {
+                        format!("{}\n\nRespond to the discussion. You can include CONSENSUS_REACHED in your response if you believe we've reached a good conclusion.", conversation_history)
+                    } else {
+                        format!("{}\n\nRespond to the discussion.", conversation_history)
+                    };
                     let response = call_agent_with_timeout(agent, &prompt, agent_id).await?;
 
                     sender.send(ExecutionEvent::ConversationMessage {
