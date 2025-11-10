@@ -72,6 +72,7 @@ pub struct CompareResponse {
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ExecutionEvent {
+    #[allow(dead_code)]
     AgentStart {
         agent_id: String,
         timestamp: String,
@@ -90,11 +91,13 @@ pub enum ExecutionEvent {
         response: String,
         timestamp: String,
     },
+    #[allow(dead_code)]
     AgentComplete {
         agent_id: String,
         output_preview: String,
         timestamp: String,
     },
+    #[allow(dead_code)]
     AgentError {
         agent_id: String,
         error: String,

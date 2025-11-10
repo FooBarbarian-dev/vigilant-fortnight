@@ -9,6 +9,7 @@ use axum::{
     response::Response,
 };
 use futures::{sink::SinkExt, stream::StreamExt};
+use rig_patterns::Agent;
 use std::sync::Arc;
 
 /// WebSocket upgrade handler
@@ -84,77 +85,66 @@ async fn handle_socket(socket: WebSocket, _state: AxumState<Arc<crate::state::Ap
     tracing::info!("WebSocket connection closed");
 }
 
-/// Execute pattern with streaming events
-/// NOTE: This is MOCK/SIMULATED execution for demonstration purposes!
-/// Real LLM API calls would be made in a production version.
+/// Execute pattern with streaming events using real LLM API calls
 async fn execute_with_streaming(
     sender: &mut futures::stream::SplitSink<WebSocket, Message>,
     request: ExecuteRequest,
 ) -> anyhow::Result<()> {
     use crate::state::PatternConfig;
 
-    tracing::warn!("⚠️  MOCK EXECUTION - This is simulated for demo purposes, not calling real LLM APIs");
+    tracing::info!("🚀 REAL EXECUTION - Making actual LLM API calls");
 
-    // Send a notification that this is mock execution
-    send_event(
-        sender,
-        ExecutionEvent::PatternStep {
-            message: "⚠️  DEMO MODE: Simulating LLM responses (not calling real APIs)".to_string(),
-            timestamp: chrono::Utc::now().to_rfc3339(),
-        },
-    )
-    .await?;
+    // Create real agents from the request
+    let agents: Vec<Agent> = request
+        .agents
+        .iter()
+        .map(|cfg| {
+            Agent::from_env(&cfg.id, &cfg.provider, &cfg.model, &cfg.system_prompt)
+        })
+        .collect::<anyhow::Result<Vec<_>>>()?;
 
-    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+    tracing::info!("Created {} agents successfully", agents.len());
 
-    // Simulate execution with detailed streaming events
+    // Execute with real LLM calls and detailed streaming events
     match &request.pattern {
         PatternConfig::Sequential => {
-            tracing::info!("Starting SEQUENTIAL pattern with {} agents", request.agents.len());
+            tracing::info!("Starting SEQUENTIAL pattern with {} agents", agents.len());
             let mut current_input = request.input.clone();
 
-            for (idx, agent) in request.agents.iter().enumerate() {
-                tracing::info!("[Sequential Step {}/{}] Agent: {}", idx + 1, request.agents.len(), agent.id);
+            for (idx, agent) in agents.iter().enumerate() {
+                tracing::info!("[Sequential Step {}/{}] Agent: {}", idx + 1, agents.len(), agent.id());
 
                 // Agent receives input
-                tracing::debug!("  → Agent {} receives input: {}...", agent.id, &current_input[..current_input.len().min(80)]);
+                tracing::debug!("  → Agent {} receives input: {}...", agent.id(), &current_input[..current_input.len().min(80)]);
                 send_event(
                     sender,
                     ExecutionEvent::AgentReceivesInput {
-                        agent_id: agent.id.clone(),
+                        agent_id: agent.id().to_string(),
                         input: current_input.clone(),
                         timestamp: chrono::Utc::now().to_rfc3339(),
                     },
                 )
                 .await?;
 
-                tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
-
                 // Agent thinking
-                tracing::debug!("  → Agent {} is thinking...", agent.id);
+                tracing::debug!("  → Agent {} is thinking...", agent.id());
                 send_event(
                     sender,
                     ExecutionEvent::AgentThinking {
-                        agent_id: agent.id.clone(),
+                        agent_id: agent.id().to_string(),
                         timestamp: chrono::Utc::now().to_rfc3339(),
                     },
                 )
                 .await?;
 
-                tokio::time::sleep(tokio::time::Duration::from_millis(700)).await;
+                // *** REAL LLM CALL ***
+                let response = agent.prompt(&current_input).await?;
 
-                // Agent responds
-                let response = format!(
-                    "Processed by {}: Enhanced and refined the input with my expertise in {}. Ready for next stage.",
-                    agent.id,
-                    agent.system_prompt.split_whitespace().take(5).collect::<Vec<_>>().join(" ")
-                );
-
-                tracing::debug!("  → Agent {} responds: {}...", agent.id, &response[..response.len().min(80)]);
+                tracing::debug!("  → Agent {} responds: {}...", agent.id(), &response[..response.len().min(80)]);
                 send_event(
                     sender,
                     ExecutionEvent::AgentResponds {
-                        agent_id: agent.id.clone(),
+                        agent_id: agent.id().to_string(),
                         response: response.clone(),
                         timestamp: chrono::Utc::now().to_rfc3339(),
                     },
@@ -162,8 +152,6 @@ async fn execute_with_streaming(
                 .await?;
 
                 current_input = response;
-
-                tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
             }
 
             tracing::info!("Sequential pattern completed");
@@ -174,7 +162,7 @@ async fn execute_with_streaming(
                     output: current_input,
                     metadata: serde_json::json!({
                         "pattern": "sequential",
-                        "steps": request.agents.len(),
+                        "steps": agents.len(),
                     }),
                     timestamp: chrono::Utc::now().to_rfc3339(),
                 },
@@ -183,12 +171,14 @@ async fn execute_with_streaming(
         }
 
         PatternConfig::Concurrent { aggregation } => {
+            tracing::info!("Starting CONCURRENT pattern with {} agents", agents.len());
+
             // All agents receive the same input
-            for agent in &request.agents {
+            for agent in &agents {
                 send_event(
                     sender,
                     ExecutionEvent::AgentReceivesInput {
-                        agent_id: agent.id.clone(),
+                        agent_id: agent.id().to_string(),
                         input: request.input.clone(),
                         timestamp: chrono::Utc::now().to_rfc3339(),
                     },
@@ -196,41 +186,45 @@ async fn execute_with_streaming(
                 .await?;
             }
 
-            tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
-
             // All thinking concurrently
-            for agent in &request.agents {
+            for agent in &agents {
                 send_event(
                     sender,
                     ExecutionEvent::AgentThinking {
-                        agent_id: agent.id.clone(),
+                        agent_id: agent.id().to_string(),
                         timestamp: chrono::Utc::now().to_rfc3339(),
                     },
                 )
                 .await?;
             }
 
-            tokio::time::sleep(tokio::time::Duration::from_millis(800)).await;
+            // *** REAL CONCURRENT LLM CALLS ***
+            let mut tasks = Vec::new();
+            for agent in &agents {
+                let input = request.input.clone();
+                let agent_clone = agent.clone();
+                tasks.push(tokio::spawn(async move {
+                    let response = agent_clone.prompt(&input).await?;
+                    Ok::<(String, String), anyhow::Error>((agent_clone.id().to_string(), response))
+                }));
+            }
 
-            // All respond
-            for agent in &request.agents {
-                let response = format!(
-                    "From {}'s perspective: I analyzed this from my specialized viewpoint. My findings suggest: [detailed analysis based on {}]",
-                    agent.id,
-                    agent.system_prompt.split_whitespace().take(4).collect::<Vec<_>>().join(" ")
-                );
+            // Wait for all responses
+            let mut responses = Vec::new();
+            for task in tasks {
+                let (agent_id, response) = task.await??;
 
                 send_event(
                     sender,
                     ExecutionEvent::AgentResponds {
-                        agent_id: agent.id.clone(),
-                        response,
+                        agent_id: agent_id.clone(),
+                        response: response.clone(),
                         timestamp: chrono::Utc::now().to_rfc3339(),
                     },
                 )
                 .await?;
 
-                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                responses.push(response);
             }
 
             send_event(
@@ -242,15 +236,18 @@ async fn execute_with_streaming(
             )
             .await?;
 
-            tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
+            // Simple aggregation for now
+            let aggregated = responses.join("\n\n---\n\n");
+
+            tracing::info!("Concurrent pattern completed");
 
             send_event(
                 sender,
                 ExecutionEvent::PatternComplete {
-                    output: format!("Combined insights from {} agents using {:?} aggregation", request.agents.len(), aggregation),
+                    output: aggregated,
                     metadata: serde_json::json!({
                         "pattern": "concurrent",
-                        "agents": request.agents.len(),
+                        "agents": agents.len(),
                         "aggregation": format!("{:?}", aggregation),
                     }),
                     timestamp: chrono::Utc::now().to_rfc3339(),
@@ -260,8 +257,9 @@ async fn execute_with_streaming(
         }
 
         PatternConfig::GroupChat { max_rounds } => {
-            let rounds = (*max_rounds).min(3);
-            let mut conversation_history = request.input.clone();
+            tracing::info!("Starting GROUP_CHAT pattern with {} agents", agents.len());
+            let rounds = *max_rounds;
+            let mut conversation_history = format!("Initial prompt: {}", request.input);
 
             for round in 1..=rounds {
                 send_event(
@@ -273,68 +271,79 @@ async fn execute_with_streaming(
                 )
                 .await?;
 
-                tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
-
-                for agent in &request.agents {
+                for agent in &agents {
                     // Agent receives conversation history
                     send_event(
                         sender,
                         ExecutionEvent::AgentReceivesInput {
-                            agent_id: agent.id.clone(),
+                            agent_id: agent.id().to_string(),
                             input: conversation_history.clone(),
                             timestamp: chrono::Utc::now().to_rfc3339(),
                         },
                     )
                     .await?;
 
-                    tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
-
                     send_event(
                         sender,
                         ExecutionEvent::AgentThinking {
-                            agent_id: agent.id.clone(),
+                            agent_id: agent.id().to_string(),
                             timestamp: chrono::Utc::now().to_rfc3339(),
                         },
                     )
                     .await?;
 
-                    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-
-                    let response = if round == rounds {
-                        format!("{}: I agree with the direction we've reached. This looks good! CONSENSUS_REACHED", agent.id)
-                    } else {
-                        format!(
-                            "{}: Here's my take - {}. What do others think?",
-                            agent.id,
-                            agent.system_prompt.split_whitespace().take(6).collect::<Vec<_>>().join(" ")
-                        )
-                    };
+                    // *** REAL LLM CALL ***
+                    let prompt = format!("{}\n\nRespond to the discussion. Include CONSENSUS_REACHED in your response if you believe we've reached a good conclusion.", conversation_history);
+                    let response = agent.prompt(&prompt).await?;
 
                     send_event(
                         sender,
                         ExecutionEvent::ConversationMessage {
-                            from: agent.id.clone(),
+                            from: agent.id().to_string(),
                             message: response.clone(),
-                            message_type: if round == rounds { "consensus".to_string() } else { "output".to_string() },
+                            message_type: if response.contains("CONSENSUS_REACHED") {
+                                "consensus".to_string()
+                            } else {
+                                "output".to_string()
+                            },
                             timestamp: chrono::Utc::now().to_rfc3339(),
                         },
                     )
                     .await?;
 
-                    conversation_history.push_str(&format!("\n{}", response));
+                    conversation_history.push_str(&format!("\n{}: {}", agent.id(), response));
 
-                    tokio::time::sleep(tokio::time::Duration::from_millis(150)).await;
+                    // Check for consensus
+                    if response.contains("CONSENSUS_REACHED") {
+                        tracing::info!("Consensus reached at round {}", round);
+                        send_event(
+                            sender,
+                            ExecutionEvent::PatternComplete {
+                                output: conversation_history,
+                                metadata: serde_json::json!({
+                                    "pattern": "group_chat",
+                                    "rounds": round,
+                                    "participants": agents.len(),
+                                }),
+                                timestamp: chrono::Utc::now().to_rfc3339(),
+                            },
+                        )
+                        .await?;
+                        return Ok(());
+                    }
                 }
             }
+
+            tracing::info!("Group chat completed after {} rounds", rounds);
 
             send_event(
                 sender,
                 ExecutionEvent::PatternComplete {
-                    output: format!("Group consensus reached after {} rounds", rounds),
+                    output: conversation_history,
                     metadata: serde_json::json!({
                         "pattern": "group_chat",
                         "rounds": rounds,
-                        "participants": request.agents.len(),
+                        "participants": agents.len(),
                     }),
                     timestamp: chrono::Utc::now().to_rfc3339(),
                 },
@@ -342,71 +351,79 @@ async fn execute_with_streaming(
             .await?;
         }
 
-        PatternConfig::Handoff { .. } => {
-            let hops = request.agents.len().min(3);
+        PatternConfig::Handoff { max_hops } => {
+            tracing::info!("Starting HANDOFF pattern with {} agents", agents.len());
             let mut current_input = request.input.clone();
+            let mut hops = 0;
 
-            for (idx, agent) in request.agents.iter().take(hops).enumerate() {
+            for (idx, agent) in agents.iter().enumerate() {
+                if hops >= *max_hops {
+                    break;
+                }
+
                 send_event(
                     sender,
                     ExecutionEvent::AgentReceivesInput {
-                        agent_id: agent.id.clone(),
+                        agent_id: agent.id().to_string(),
                         input: current_input.clone(),
                         timestamp: chrono::Utc::now().to_rfc3339(),
                     },
                 )
                 .await?;
 
-                tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
-
                 send_event(
                     sender,
                     ExecutionEvent::AgentThinking {
-                        agent_id: agent.id.clone(),
+                        agent_id: agent.id().to_string(),
                         timestamp: chrono::Utc::now().to_rfc3339(),
                     },
                 )
                 .await?;
 
-                tokio::time::sleep(tokio::time::Duration::from_millis(600)).await;
+                // *** REAL LLM CALL ***
+                let prompt = if idx < agents.len() - 1 {
+                    format!(
+                        "{}\n\nProcess this task. If you need to hand off to another agent, include 'HANDOFF:agent_id' in your response.",
+                        current_input
+                    )
+                } else {
+                    format!("{}\n\nComplete this task and provide the final result.", current_input)
+                };
 
-                if idx < hops - 1 {
-                    let next_agent = &request.agents[idx + 1];
-                    let handoff_msg = format!(
-                        "I've handled the {} part. Handing off to {} for specialized {}",
-                        agent.system_prompt.split_whitespace().take(3).collect::<Vec<_>>().join(" "),
-                        next_agent.id,
-                        next_agent.system_prompt.split_whitespace().take(3).collect::<Vec<_>>().join(" ")
-                    );
+                let response = agent.prompt(&prompt).await?;
 
+                // Check for handoff
+                if response.contains("HANDOFF:") && idx < agents.len() - 1 {
+                    let next_agent = &agents[idx + 1];
                     send_event(
                         sender,
                         ExecutionEvent::AgentHandoff {
-                            from_agent: agent.id.clone(),
-                            to_agent: next_agent.id.clone(),
-                            message: handoff_msg.clone(),
+                            from_agent: agent.id().to_string(),
+                            to_agent: next_agent.id().to_string(),
+                            message: response.clone(),
                             timestamp: chrono::Utc::now().to_rfc3339(),
                         },
                     )
                     .await?;
-
-                    current_input = handoff_msg;
+                    current_input = response;
                 } else {
-                    let response = format!("{}: Task completed successfully. Final result ready.", agent.id);
                     send_event(
                         sender,
                         ExecutionEvent::AgentResponds {
-                            agent_id: agent.id.clone(),
+                            agent_id: agent.id().to_string(),
                             response: response.clone(),
                             timestamp: chrono::Utc::now().to_rfc3339(),
                         },
                     )
                     .await?;
                     current_input = response;
+                    break;
                 }
 
-                tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+                hops += 1;
             }
+
+            tracing::info!("Handoff pattern completed after {} hops", hops);
 
             send_event(
                 sender,
@@ -422,101 +439,115 @@ async fn execute_with_streaming(
             .await?;
         }
 
-        PatternConfig::Magentic { .. } => {
-            // Manager creates tasks
-            let manager_id = &request.agents[0].id;
+        PatternConfig::Magentic { max_iterations } => {
+            tracing::info!("Starting MAGENTIC pattern with {} agents", agents.len());
 
+            if agents.is_empty() {
+                return Err(anyhow::anyhow!("Magentic pattern requires at least one agent (manager)"));
+            }
+
+            // First agent is the manager
+            let manager = &agents[0];
+            let workers = &agents[1..];
+
+            // Manager receives input and creates task breakdown
             send_event(
                 sender,
                 ExecutionEvent::AgentReceivesInput {
-                    agent_id: manager_id.clone(),
+                    agent_id: manager.id().to_string(),
                     input: request.input.clone(),
                     timestamp: chrono::Utc::now().to_rfc3339(),
                 },
             )
             .await?;
 
-            tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
-
             send_event(
                 sender,
                 ExecutionEvent::AgentThinking {
-                    agent_id: manager_id.clone(),
+                    agent_id: manager.id().to_string(),
                     timestamp: chrono::Utc::now().to_rfc3339(),
                 },
             )
             .await?;
 
-            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-
-            let tasks = vec![
-                "Analyze core requirements",
-                "Research relevant approaches",
-                "Synthesize findings"
-            ];
+            // *** REAL LLM CALL - Manager breaks down tasks ***
+            let task_breakdown_prompt = format!(
+                "{}\n\nBreak this down into 2-4 specific subtasks. List each task on a new line starting with '- '.",
+                request.input
+            );
+            let task_breakdown = manager.prompt(&task_breakdown_prompt).await?;
 
             send_event(
                 sender,
                 ExecutionEvent::AgentResponds {
-                    agent_id: manager_id.clone(),
-                    response: format!("Task breakdown: {}", tasks.join(", ")),
+                    agent_id: manager.id().to_string(),
+                    response: task_breakdown.clone(),
                     timestamp: chrono::Utc::now().to_rfc3339(),
                 },
             )
             .await?;
 
-            tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+            // Parse tasks from response
+            let tasks: Vec<String> = task_breakdown
+                .lines()
+                .filter(|line| line.trim().starts_with("- "))
+                .map(|line| line.trim_start_matches("- ").trim().to_string())
+                .collect();
 
-            for task in &tasks {
+            let mut task_results = Vec::new();
+
+            // Assign tasks to workers
+            for (idx, task) in tasks.iter().take(*max_iterations).enumerate() {
                 send_event(
                     sender,
                     ExecutionEvent::PatternStep {
-                        message: format!("📋 Assigning: {}", task),
+                        message: format!("📋 Assigning task {}/{}: {}", idx + 1, tasks.len(), task),
                         timestamp: chrono::Utc::now().to_rfc3339(),
                     },
                 )
                 .await?;
 
-                if request.agents.len() > 1 {
-                    let worker = &request.agents[1];
+                if !workers.is_empty() {
+                    // Round-robin task assignment to workers
+                    let worker = &workers[idx % workers.len()];
 
                     send_event(
                         sender,
                         ExecutionEvent::AgentReceivesInput {
-                            agent_id: worker.id.clone(),
-                            input: task.to_string(),
+                            agent_id: worker.id().to_string(),
+                            input: task.clone(),
                             timestamp: chrono::Utc::now().to_rfc3339(),
                         },
                     )
                     .await?;
-
-                    tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
 
                     send_event(
                         sender,
                         ExecutionEvent::AgentThinking {
-                            agent_id: worker.id.clone(),
+                            agent_id: worker.id().to_string(),
                             timestamp: chrono::Utc::now().to_rfc3339(),
                         },
                     )
                     .await?;
 
-                    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+                    // *** REAL LLM CALL - Worker completes task ***
+                    let result = worker.prompt(task).await?;
 
                     send_event(
                         sender,
                         ExecutionEvent::AgentResponds {
-                            agent_id: worker.id.clone(),
-                            response: format!("Completed: {} ✓", task),
+                            agent_id: worker.id().to_string(),
+                            response: result.clone(),
                             timestamp: chrono::Utc::now().to_rfc3339(),
                         },
                     )
                     .await?;
-                }
 
-                tokio::time::sleep(tokio::time::Duration::from_millis(150)).await;
+                    task_results.push(format!("Task: {}\nResult: {}", task, result));
+                }
             }
 
+            // Manager synthesizes results
             send_event(
                 sender,
                 ExecutionEvent::PatternStep {
@@ -526,15 +557,32 @@ async fn execute_with_streaming(
             )
             .await?;
 
-            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+            send_event(
+                sender,
+                ExecutionEvent::AgentThinking {
+                    agent_id: manager.id().to_string(),
+                    timestamp: chrono::Utc::now().to_rfc3339(),
+                },
+            )
+            .await?;
+
+            // *** REAL LLM CALL - Manager synthesizes ***
+            let synthesis_prompt = format!(
+                "Synthesize these task results into a cohesive final answer:\n\n{}",
+                task_results.join("\n\n")
+            );
+            let final_output = manager.prompt(&synthesis_prompt).await?;
+
+            tracing::info!("Magentic pattern completed");
 
             send_event(
                 sender,
                 ExecutionEvent::PatternComplete {
-                    output: format!("All {} tasks completed and synthesized", tasks.len()),
+                    output: final_output,
                     metadata: serde_json::json!({
                         "pattern": "magentic",
                         "tasks_completed": tasks.len(),
+                        "workers_used": workers.len(),
                     }),
                     timestamp: chrono::Utc::now().to_rfc3339(),
                 },

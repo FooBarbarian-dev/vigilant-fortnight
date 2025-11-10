@@ -4,7 +4,7 @@
 //! Note: This is a simplified implementation that demonstrates the structure. In practice,
 //! you would need to handle API client initialization with credentials.
 
-use crate::patterns::{Pattern, Aggregation};
+use crate::patterns::Pattern;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
@@ -132,6 +132,7 @@ impl OrchestratorConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::patterns::Aggregation;
 
     #[test]
     fn test_parse_sequential_config() {
