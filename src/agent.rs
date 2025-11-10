@@ -68,6 +68,7 @@ impl Agent {
             }
             ModelProvider::Anthropic(model) => {
                 let request = CompletionRequestBuilder::new(model.clone(), full_prompt)
+                    .max_tokens(4096) // Anthropic requires max_tokens to be set
                     .build();
                 let response = model.completion(request).await
                     .map_err(|e| anyhow::anyhow!("Anthropic completion failed: {}", e))?;
