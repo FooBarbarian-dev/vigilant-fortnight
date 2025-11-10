@@ -368,7 +368,7 @@ function executeAllPatterns() {
     };
 
     patternConfigs.concurrent = {
-        pattern: { type: 'concurrent', aggregation: 'Combine' },
+        pattern: { type: 'concurrent', aggregation: 'combine' },
         agents: state.patterns.concurrent
     };
 
@@ -393,6 +393,9 @@ function executeAllPatterns() {
     };
 
     console.log('📤 Sending CompareRequest:', request);
+    const requestJson = JSON.stringify(request);
+    console.log('📦 JSON length:', requestJson.length, 'bytes');
+    console.log('📦 JSON preview:', requestJson.substring(0, 500));
 
     // Connect WebSocket
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -405,7 +408,8 @@ function executeAllPatterns() {
     ws.onopen = () => {
         console.log('✅ WebSocket connected');
         updateWebSocketStatus('connected');
-        ws.send(JSON.stringify(request));
+        console.log('📤 Sending JSON to server...');
+        ws.send(requestJson);
     };
 
     ws.onmessage = (event) => {

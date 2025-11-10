@@ -43,50 +43,64 @@ async fn handle_socket(socket: WebSocket, _state: AxumState<Arc<crate::state::Ap
             tracing::debug!("Received WebSocket message: {} bytes", text.len());
 
             // Try parsing as CompareRequest first (executes all patterns)
-            if let Ok(request) = serde_json::from_str::<CompareRequest>(&text) {
-                tracing::info!(
-                    "========== PATTERN COMPARISON START ==========\n\
-                     Input: {}\n\
-                     Executing all patterns in parallel",
-                    request.input
-                );
+            match serde_json::from_str::<CompareRequest>(&text) {
+                Ok(request) => {
+                    tracing::info!(
+                        "========== PATTERN COMPARISON START ==========\n\
+                         Input: {}\n\
+                         Executing all patterns in parallel",
+                        request.input
+                    );
 
-                // Execute all patterns in parallel
-                if let Err(e) = execute_all_patterns(&mut sender, request).await {
-                    tracing::error!("Pattern comparison error: {}", e);
+                    // Execute all patterns in parallel
+                    if let Err(e) = execute_all_patterns(&mut sender, request).await {
+                        tracing::error!("Pattern comparison error: {}", e);
+                    }
+
+                    tracing::info!("========== PATTERN COMPARISON COMPLETE ==========");
                 }
+                Err(compare_err) => {
+                    // Try parsing as ExecuteRequest for backward compatibility
+                    match serde_json::from_str::<ExecuteRequest>(&text) {
+                        Ok(request) => {
+                            tracing::info!(
+                                "========== SINGLE PATTERN EXECUTION START ==========\n\
+                                 Pattern: {:?}\n\
+                                 Agents: {}\n\
+                                 Input: {}",
+                                request.pattern,
+                                request.agents.len(),
+                                request.input
+                            );
 
-                tracing::info!("========== PATTERN COMPARISON COMPLETE ==========");
-            }
-            // Fall back to single pattern execution for backward compatibility
-            else if let Ok(request) = serde_json::from_str::<ExecuteRequest>(&text) {
-                tracing::info!(
-                    "========== SINGLE PATTERN EXECUTION START ==========\n\
-                     Pattern: {:?}\n\
-                     Agents: {}\n\
-                     Input: {}",
-                    request.pattern,
-                    request.agents.len(),
-                    request.input
-                );
+                            let pattern_id = format!("{:?}", request.pattern).to_lowercase();
+                            if let Err(e) = execute_single_pattern(&mut sender, pattern_id, request.agents, request.pattern, request.input).await {
+                                tracing::error!("Single pattern execution error: {}", e);
+                            }
 
-                let pattern_id = format!("{:?}", request.pattern).to_lowercase();
-                if let Err(e) = execute_single_pattern(&mut sender, pattern_id, request.agents, request.pattern, request.input).await {
-                    tracing::error!("Single pattern execution error: {}", e);
+                            tracing::info!("========== SINGLE PATTERN EXECUTION COMPLETE ==========");
+                        }
+                        Err(execute_err) => {
+                            tracing::error!("❌ Failed to parse as CompareRequest: {}", compare_err);
+                            tracing::error!("❌ Failed to parse as ExecuteRequest: {}", execute_err);
+                            tracing::error!("📄 JSON length: {} bytes", text.len());
+                            tracing::error!("📄 JSON start: {}", &text[..text.len().min(500)]);
+                            if text.len() > 500 {
+                                tracing::error!("📄 JSON end: {}", &text[text.len().saturating_sub(300)..]);
+                            }
+
+                            let _ = send_event(
+                                &mut sender,
+                                ExecutionEvent::PatternError {
+                                    pattern_id: "unknown".to_string(),
+                                    error: format!("JSON parse error: {}", compare_err),
+                                    timestamp: chrono::Utc::now().to_rfc3339(),
+                                },
+                            )
+                            .await;
+                        }
+                    }
                 }
-
-                tracing::info!("========== SINGLE PATTERN EXECUTION COMPLETE ==========");
-            } else {
-                tracing::error!("Failed to parse request - Raw text: {}", &text[..text.len().min(200)]);
-                let _ = send_event(
-                    &mut sender,
-                    ExecutionEvent::PatternError {
-                        pattern_id: "unknown".to_string(),
-                        error: "Invalid request format".to_string(),
-                        timestamp: chrono::Utc::now().to_rfc3339(),
-                    },
-                )
-                .await;
             }
         }
     }

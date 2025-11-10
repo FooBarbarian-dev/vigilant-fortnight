@@ -1,0 +1,74 @@
+{
+  "input": "Tell me about Rust",
+  "pattern_configs": {
+    "sequential": {
+      "pattern": {
+        "type": "sequential"
+      },
+      "agents": [
+        {
+          "id": "agent1",
+          "provider": "openai",
+          "model": "gpt-4",
+          "system_prompt": "You are helpful."
+        }
+      ]
+    },
+    "concurrent": {
+      "pattern": {
+        "type": "concurrent",
+        "aggregation": "combine"
+      },
+      "agents": [
+        {
+          "id": "agent1",
+          "provider": "openai",
+          "model": "gpt-4",
+          "system_prompt": "You are helpful."
+        }
+      ]
+    },
+    "group_chat": {
+      "pattern": {
+        "type": "group_chat",
+        "max_rounds": 3
+      },
+      "agents": [
+        {
+          "id": "agent1",
+          "provider": "openai",
+          "model": "gpt-4",
+          "system_prompt": "You are helpful."
+        }
+      ]
+    },
+    "handoff": {
+      "pattern": {
+        "type": "handoff",
+        "max_hops": 5
+      },
+      "agents": [
+        {
+          "id": "agent1",
+          "provider": "openai",
+          "model": "gpt-4",
+          "system_prompt": "You are helpful."
+        }
+      ]
+    },
+    "magentic": {
+      "pattern": {
+        "type": "magentic",
+        "max_iterations": 5
+      },
+      "agents": [
+        {
+          "id": "manager",
+          "provider": "openai",
+          "model": "gpt-4",
+          "system_prompt": "You are a manager."
+        }
+      ]
+    }
+  }
+}
