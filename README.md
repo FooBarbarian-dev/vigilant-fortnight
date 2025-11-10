@@ -85,7 +85,31 @@ cargo run --example real_llm_integration
 
 ### Running the Interactive UI
 
-The UI provides a visual demonstration of all orchestration patterns with real-time execution visualization:
+#### 🚀 Quick Launch (Recommended)
+
+The easiest way to get started is using the launch script:
+
+```bash
+# Linux/macOS
+export OPENAI_API_KEY="sk-..."  # Set your API key
+./run.sh                         # Pull, build, and launch
+
+# Windows
+set OPENAI_API_KEY=sk-...       # Set your API key
+run.bat                          # Pull, build, and launch
+```
+
+This script automatically:
+1. Checks prerequisites (git, cargo, API keys)
+2. Pulls the latest code from git
+3. Builds everything in release mode
+4. Launches the UI at http://localhost:3000
+
+See **[QUICK_START.md](QUICK_START.md)** for detailed setup instructions.
+
+#### Manual Launch
+
+If you prefer to build manually:
 
 ```bash
 # From the root directory
@@ -99,11 +123,12 @@ cargo run --release --bin rig-patterns-ui
 Then open your browser to `http://localhost:3000`
 
 **Features:**
-- Configure multiple agents with different roles
-- Switch between all 5 orchestration patterns
-- Real-time visualization of agent execution
-- Compare pattern performance side-by-side
-- Load preset configurations
+- **5 Pattern Tabs** - Sequential, Concurrent, Group Chat, Handoff, Magentic
+- **Expected DAG Visualization** - See execution flow before running
+- **Per-Pattern Agent Configuration** - Customize agents for each pattern
+- **Execute All Patterns** - Run all 5 patterns in parallel with one click
+- **Real-time Execution Logs** - Watch agents process in real-time
+- **Provider Tracking** - See which LLM (OpenAI/Anthropic/Cohere) each agent uses
 
 ### Setting Up API Keys (Optional)
 
