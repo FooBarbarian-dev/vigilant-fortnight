@@ -1165,23 +1165,94 @@ body {
     }
 }
 
-/* === FINAL RESULT SECTION === */
-.final-result-section {
-    margin-bottom: 2rem;
+/* === RESULTS COMPARISON SECTION === */
+.results-comparison-section {
+    margin-top: 3rem;
+    padding: 2rem;
+    background: var(--bg-panel);
+    border-top: 2px solid var(--neon-cyan);
 }
 
-.final-result-section h4 {
-    margin-bottom: 1rem;
+.results-comparison-section h2 {
+    color: var(--neon-cyan);
+    font-family: var(--font-title);
+    text-align: center;
+    margin-bottom: 2rem;
+    font-size: 2rem;
+    letter-spacing: 3px;
+    text-shadow: var(--glow-cyan);
+}
+
+.comparison-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 1.5rem;
+}
+
+.result-card {
+    background: var(--bg-card);
+    border: 2px solid var(--neon-cyan);
+    border-radius: 8px;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.result-card:hover {
+    border-color: var(--neon-green);
+    box-shadow: var(--glow-cyan);
+    transform: translateY(-2px);
+}
+
+.result-card-header {
+    background: rgba(0, 255, 255, 0.1);
+    padding: 1rem;
+    border-bottom: 1px solid var(--neon-cyan);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.result-card-header h3 {
+    margin: 0;
+    font-size: 1.2rem;
+    color: var(--neon-cyan);
+    font-family: var(--font-title);
+}
+
+.result-status {
+    padding: 0.25rem 0.75rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: bold;
+    letter-spacing: 1px;
+}
+
+.result-status.pending {
+    background: rgba(128, 128, 128, 0.2);
+    color: var(--text-secondary);
+}
+
+.result-status.running {
+    background: rgba(255, 255, 0, 0.2);
+    color: var(--neon-yellow);
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+.result-status.complete {
+    background: rgba(0, 255, 0, 0.2);
     color: var(--neon-green);
 }
 
-.final-result {
-    background: var(--bg-card);
-    border: 2px solid var(--neon-green);
-    border-radius: 4px;
+.result-status.error {
+    background: rgba(255, 0, 0, 0.2);
+    color: #ff6666;
+}
+
+.result-card-body {
     padding: 1.5rem;
-    max-height: 500px;
+    max-height: 400px;
     overflow-y: auto;
+    min-height: 150px;
 }
 
 .result-placeholder {
@@ -1197,6 +1268,7 @@ body {
     white-space: pre-wrap;
     word-wrap: break-word;
     line-height: 1.6;
+    font-size: 0.9rem;
 }
 
 .result-content.success {

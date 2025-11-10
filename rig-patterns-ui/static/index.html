@@ -111,16 +111,7 @@
                         <div class="dag-section">
                             <h4><span class="icon">◬</span> Expected Execution DAG</h4>
                             <div class="dag-container">
-                                <pre class="mermaid" id="dag-sequential">
-graph LR
-    INPUT[Input] --> A1[Agent 1<br/>openai]
-    A1 --> A2[Agent 2<br/>openai]
-    A2 --> OUTPUT[Output]
-    style INPUT fill:#1a1a2e,stroke:#00ffff
-    style A1 fill:#16213e,stroke:#00ff00
-    style A2 fill:#16213e,stroke:#00ff00
-    style OUTPUT fill:#1a1a2e,stroke:#ff00ff
-                                </pre>
+                                <pre class="mermaid" id="dag-sequential"></pre>
                             </div>
                         </div>
 
@@ -128,13 +119,6 @@ graph LR
                             <h4><span class="icon">◉</span> Execution Log</h4>
                             <div class="execution-log" id="log-sequential">
                                 <div class="log-placeholder">Awaiting execution...</div>
-                            </div>
-                        </div>
-
-                        <div class="final-result-section">
-                            <h4><span class="icon">✓</span> Final Result</h4>
-                            <div class="final-result" id="result-sequential">
-                                <div class="result-placeholder">No result yet. Execute patterns to see the final output.</div>
                             </div>
                         </div>
                     </div>
@@ -159,19 +143,7 @@ graph LR
                         <div class="dag-section">
                             <h4><span class="icon">◬</span> Expected Execution DAG</h4>
                             <div class="dag-container">
-                                <pre class="mermaid" id="dag-concurrent">
-graph TD
-    INPUT[Input] --> A1[Agent 1<br/>openai]
-    INPUT --> A2[Agent 2<br/>openai]
-    A1 --> AGG[Aggregator]
-    A2 --> AGG
-    AGG --> OUTPUT[Output]
-    style INPUT fill:#1a1a2e,stroke:#00ffff
-    style A1 fill:#16213e,stroke:#00ff00
-    style A2 fill:#16213e,stroke:#00ff00
-    style AGG fill:#16213e,stroke:#ffff00
-    style OUTPUT fill:#1a1a2e,stroke:#ff00ff
-                                </pre>
+                                <pre class="mermaid" id="dag-concurrent"></pre>
                             </div>
                         </div>
 
@@ -179,13 +151,6 @@ graph TD
                             <h4><span class="icon">◉</span> Execution Log</h4>
                             <div class="execution-log" id="log-concurrent">
                                 <div class="log-placeholder">Awaiting execution...</div>
-                            </div>
-                        </div>
-
-                        <div class="final-result-section">
-                            <h4><span class="icon">✓</span> Final Result</h4>
-                            <div class="final-result" id="result-concurrent">
-                                <div class="result-placeholder">No result yet. Execute patterns to see the final output.</div>
                             </div>
                         </div>
                     </div>
@@ -210,22 +175,7 @@ graph TD
                         <div class="dag-section">
                             <h4><span class="icon">◬</span> Expected Execution DAG</h4>
                             <div class="dag-container">
-                                <pre class="mermaid" id="dag-group_chat">
-graph TD
-    INPUT[Input] --> R1[Round 1]
-    R1 --> A1[Agent 1<br/>openai]
-    R1 --> A2[Agent 2<br/>openai]
-    A1 --> R2[Round 2]
-    A2 --> R2
-    R2 --> A3[Agent 1<br/>openai]
-    R2 --> A4[Agent 2<br/>openai]
-    A3 --> CON[Consensus?]
-    A4 --> CON
-    CON -->|Yes| OUTPUT[Output]
-    CON -->|No| R3[Round 3...]
-    style INPUT fill:#1a1a2e,stroke:#00ffff
-    style OUTPUT fill:#1a1a2e,stroke:#ff00ff
-                                </pre>
+                                <pre class="mermaid" id="dag-group_chat"></pre>
                             </div>
                         </div>
 
@@ -233,13 +183,6 @@ graph TD
                             <h4><span class="icon">◉</span> Execution Log</h4>
                             <div class="execution-log" id="log-group_chat">
                                 <div class="log-placeholder">Awaiting execution...</div>
-                            </div>
-                        </div>
-
-                        <div class="final-result-section">
-                            <h4><span class="icon">✓</span> Final Result</h4>
-                            <div class="final-result" id="result-group_chat">
-                                <div class="result-placeholder">No result yet. Execute patterns to see the final output.</div>
                             </div>
                         </div>
                     </div>
@@ -264,16 +207,7 @@ graph TD
                         <div class="dag-section">
                             <h4><span class="icon">◬</span> Expected Execution DAG</h4>
                             <div class="dag-container">
-                                <pre class="mermaid" id="dag-handoff">
-graph LR
-    INPUT[Input] --> A1[Agent 1<br/>openai]
-    A1 -->|HANDOFF| A2[Agent 2<br/>openai]
-    A2 --> OUTPUT[Output]
-    style INPUT fill:#1a1a2e,stroke:#00ffff
-    style A1 fill:#16213e,stroke:#00ff00
-    style A2 fill:#16213e,stroke:#00ff00
-    style OUTPUT fill:#1a1a2e,stroke:#ff00ff
-                                </pre>
+                                <pre class="mermaid" id="dag-handoff"></pre>
                             </div>
                         </div>
 
@@ -281,13 +215,6 @@ graph LR
                             <h4><span class="icon">◉</span> Execution Log</h4>
                             <div class="execution-log" id="log-handoff">
                                 <div class="log-placeholder">Awaiting execution...</div>
-                            </div>
-                        </div>
-
-                        <div class="final-result-section">
-                            <h4><span class="icon">✓</span> Final Result</h4>
-                            <div class="final-result" id="result-handoff">
-                                <div class="result-placeholder">No result yet. Execute patterns to see the final output.</div>
                             </div>
                         </div>
                     </div>
@@ -313,24 +240,7 @@ graph LR
                         <div class="dag-section">
                             <h4><span class="icon">◬</span> Expected Execution DAG</h4>
                             <div class="dag-container">
-                                <pre class="mermaid" id="dag-magentic">
-graph TD
-    INPUT[Input] --> MGR[Manager<br/>openai]
-    MGR --> T1[Task 1]
-    MGR --> T2[Task 2]
-    T1 --> W1[Worker 1<br/>openai]
-    T2 --> W2[Worker 2<br/>openai]
-    W1 --> SYN[Synthesize]
-    W2 --> SYN
-    SYN --> MGR2[Manager]
-    MGR2 --> OUTPUT[Output]
-    style INPUT fill:#1a1a2e,stroke:#00ffff
-    style MGR fill:#16213e,stroke:#ffff00
-    style MGR2 fill:#16213e,stroke:#ffff00
-    style W1 fill:#16213e,stroke:#00ff00
-    style W2 fill:#16213e,stroke:#00ff00
-    style OUTPUT fill:#1a1a2e,stroke:#ff00ff
-                                </pre>
+                                <pre class="mermaid" id="dag-magentic"></pre>
                             </div>
                         </div>
 
@@ -340,11 +250,60 @@ graph TD
                                 <div class="log-placeholder">Awaiting execution...</div>
                             </div>
                         </div>
+                    </div>
+                </div>
 
-                        <div class="final-result-section">
-                            <h4><span class="icon">✓</span> Final Result</h4>
-                            <div class="final-result" id="result-magentic">
-                                <div class="result-placeholder">No result yet. Execute patterns to see the final output.</div>
+                <!-- Results Comparison Section -->
+                <div class="results-comparison-section">
+                    <h2><span class="icon">📊</span> RESULTS COMPARISON</h2>
+                    <div class="comparison-grid">
+                        <div class="result-card" id="card-sequential">
+                            <div class="result-card-header">
+                                <h3>🔗 Sequential</h3>
+                                <span class="result-status" id="status-result-sequential">PENDING</span>
+                            </div>
+                            <div class="result-card-body" id="result-sequential">
+                                <div class="result-placeholder">Awaiting execution...</div>
+                            </div>
+                        </div>
+
+                        <div class="result-card" id="card-concurrent">
+                            <div class="result-card-header">
+                                <h3>⚡ Concurrent</h3>
+                                <span class="result-status" id="status-result-concurrent">PENDING</span>
+                            </div>
+                            <div class="result-card-body" id="result-concurrent">
+                                <div class="result-placeholder">Awaiting execution...</div>
+                            </div>
+                        </div>
+
+                        <div class="result-card" id="card-group_chat">
+                            <div class="result-card-header">
+                                <h3>💬 Group Chat</h3>
+                                <span class="result-status" id="status-result-group_chat">PENDING</span>
+                            </div>
+                            <div class="result-card-body" id="result-group_chat">
+                                <div class="result-placeholder">Awaiting execution...</div>
+                            </div>
+                        </div>
+
+                        <div class="result-card" id="card-handoff">
+                            <div class="result-card-header">
+                                <h3>🔀 Handoff</h3>
+                                <span class="result-status" id="status-result-handoff">PENDING</span>
+                            </div>
+                            <div class="result-card-body" id="result-handoff">
+                                <div class="result-placeholder">Awaiting execution...</div>
+                            </div>
+                        </div>
+
+                        <div class="result-card" id="card-magentic">
+                            <div class="result-card-header">
+                                <h3>🎯 Magentic</h3>
+                                <span class="result-status" id="status-result-magentic">PENDING</span>
+                            </div>
+                            <div class="result-card-body" id="result-magentic">
+                                <div class="result-placeholder">Awaiting execution...</div>
                             </div>
                         </div>
                     </div>

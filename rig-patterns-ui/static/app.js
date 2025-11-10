@@ -25,7 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initialize Mermaid
     mermaid.initialize({
-        startOnLoad: true,
+        startOnLoad: false,  // Changed to false - we'll render manually
         theme: 'dark',
         themeVariables: {
             primaryColor: '#16213e',
@@ -355,11 +355,26 @@ function executeAllPatterns() {
     console.log('========== EXECUTING ALL PATTERNS ==========');
     console.log('Root Prompt:', rootPrompt);
 
-    // Clear all logs
+    // Clear all logs and reset result cards
     Object.keys(state.patterns).forEach(pattern => {
+        // Clear execution log
         const log = document.getElementById(`log-${pattern}`);
         log.innerHTML = '';
+
+        // Update tab status to running
         updatePatternStatus(pattern, 'running');
+
+        // Reset result card to running state
+        const resultBody = document.getElementById(`result-${pattern}`);
+        if (resultBody) {
+            resultBody.innerHTML = '<div class="result-placeholder">Executing...</div>';
+        }
+
+        const resultStatus = document.getElementById(`status-result-${pattern}`);
+        if (resultStatus) {
+            resultStatus.className = 'result-status running';
+            resultStatus.textContent = 'RUNNING';
+        }
     });
 
     // Build pattern configs
@@ -560,6 +575,7 @@ function updatePatternStatus(pattern, status) {
 }
 
 function updateFinalResult(patternId, content, resultType) {
+    // Update result card body
     const resultContainer = document.getElementById(`result-${patternId}`);
     if (!resultContainer) {
         console.warn(`No result container found for pattern: ${patternId}`);
@@ -578,6 +594,25 @@ function updateFinalResult(patternId, content, resultType) {
 
     // Scroll to the result
     resultContainer.scrollTop = 0;
+
+    // Update result card status badge
+    const statusBadge = document.getElementById(`status-result-${patternId}`);
+    if (statusBadge) {
+        statusBadge.className = 'result-status';
+        if (resultType === 'success') {
+            statusBadge.classList.add('complete');
+            statusBadge.textContent = 'COMPLETE';
+        } else if (resultType === 'error') {
+            statusBadge.classList.add('error');
+            statusBadge.textContent = 'ERROR';
+        }
+    }
+
+    // Scroll the comparison section into view
+    const comparisonSection = document.querySelector('.results-comparison-section');
+    if (comparisonSection) {
+        comparisonSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
 }
 
 function updateWebSocketStatus(status) {
