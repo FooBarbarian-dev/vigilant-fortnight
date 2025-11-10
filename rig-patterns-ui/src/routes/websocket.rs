@@ -11,6 +11,7 @@ use axum::{
 use futures::{sink::SinkExt, stream::StreamExt};
 use rig_patterns::{Agent, Aggregation};
 use std::sync::Arc;
+use std::time::Duration;
 
 /// Trait for sending execution events (abstracts over WebSocket and channel)
 trait EventSender {
@@ -224,6 +225,18 @@ async fn execute_single_pattern(
     execute_pattern_impl(&mut ws_sender, pattern_id, agents_config, pattern, input).await
 }
 
+/// Timeout duration for agent LLM calls (60 seconds)
+const AGENT_TIMEOUT: Duration = Duration::from_secs(60);
+
+/// Helper function to call an agent with timeout
+async fn call_agent_with_timeout(agent: &Agent, prompt: &str, agent_id: &str) -> anyhow::Result<String> {
+    match tokio::time::timeout(AGENT_TIMEOUT, agent.prompt(prompt)).await {
+        Ok(Ok(response)) => Ok(response),
+        Ok(Err(e)) => Err(anyhow::anyhow!("Agent {} failed: {}", agent_id, e)),
+        Err(_) => Err(anyhow::anyhow!("Agent {} timed out after {} seconds", agent_id, AGENT_TIMEOUT.as_secs())),
+    }
+}
+
 /// Core pattern execution logic (shared by both parallel and single execution)
 async fn execute_pattern_impl<S>(
     sender: &mut S,
@@ -284,8 +297,8 @@ where
                     timestamp: chrono::Utc::now().to_rfc3339(),
                 }).await?;
 
-                // *** REAL LLM CALL ***
-                let response = agent.prompt(&current_input).await?;
+                // *** REAL LLM CALL WITH TIMEOUT ***
+                let response = call_agent_with_timeout(agent, &current_input, agent_id).await?;
 
                 sender.send(ExecutionEvent::AgentResponds {
                     pattern_id: pattern_id.clone(),
@@ -339,13 +352,14 @@ where
                 }).await?;
             }
 
-            // *** REAL CONCURRENT LLM CALLS ***
+            // *** REAL CONCURRENT LLM CALLS WITH TIMEOUT ***
             let mut tasks = Vec::new();
             for agent in &agents {
                 let input_clone = input.clone();
                 let agent_clone = agent.clone();
+                let agent_id = agent.id().to_string();
                 tasks.push(tokio::spawn(async move {
-                    let response = agent_clone.prompt(&input_clone).await?;
+                    let response = call_agent_with_timeout(&agent_clone, &input_clone, &agent_id).await?;
                     Ok::<(String, String), anyhow::Error>((agent_clone.id().to_string(), response))
                 }));
             }
@@ -421,9 +435,9 @@ where
                         timestamp: chrono::Utc::now().to_rfc3339(),
                     }).await?;
 
-                    // *** REAL LLM CALL ***
+                    // *** REAL LLM CALL WITH TIMEOUT ***
                     let prompt = format!("{}\n\nRespond to the discussion. Include CONSENSUS_REACHED in your response if you believe we've reached a good conclusion.", conversation_history);
-                    let response = agent.prompt(&prompt).await?;
+                    let response = call_agent_with_timeout(agent, &prompt, agent_id).await?;
 
                     sender.send(ExecutionEvent::ConversationMessage {
                         pattern_id: pattern_id.clone(),
@@ -500,7 +514,7 @@ where
                     timestamp: chrono::Utc::now().to_rfc3339(),
                 }).await?;
 
-                // *** REAL LLM CALL ***
+                // *** REAL LLM CALL WITH TIMEOUT ***
                 let prompt = if idx < agents.len() - 1 {
                     format!(
                         "{}\n\nProcess this task. If you need to hand off to another agent, include 'HANDOFF:agent_id' in your response.",
@@ -510,7 +524,7 @@ where
                     format!("{}\n\nComplete this task and provide the final result.", current_input)
                 };
 
-                let response = agent.prompt(&prompt).await?;
+                let response = call_agent_with_timeout(agent, &prompt, agent_id).await?;
 
                 // Check for handoff
                 if response.contains("HANDOFF:") && idx < agents.len() - 1 {
@@ -585,12 +599,12 @@ where
                 timestamp: chrono::Utc::now().to_rfc3339(),
             }).await?;
 
-            // *** REAL LLM CALL - Manager breaks down tasks ***
+            // *** REAL LLM CALL WITH TIMEOUT - Manager breaks down tasks ***
             let task_breakdown_prompt = format!(
                 "{}\n\nBreak this down into 2-4 specific subtasks. List each task on a new line starting with '- '.",
                 input
             );
-            let task_breakdown = manager.prompt(&task_breakdown_prompt).await?;
+            let task_breakdown = call_agent_with_timeout(manager, &task_breakdown_prompt, manager_id).await?;
 
             sender.send(ExecutionEvent::AgentResponds {
                 pattern_id: pattern_id.clone(),
@@ -638,8 +652,8 @@ where
                         timestamp: chrono::Utc::now().to_rfc3339(),
                     }).await?;
 
-                    // *** REAL LLM CALL - Worker completes task ***
-                    let result = worker.prompt(task).await?;
+                    // *** REAL LLM CALL WITH TIMEOUT - Worker completes task ***
+                    let result = call_agent_with_timeout(worker, task, worker_id).await?;
 
                     sender.send(ExecutionEvent::AgentResponds {
                         pattern_id: pattern_id.clone(),

@@ -63,8 +63,8 @@ function initializeDefaultAgents() {
     addAgent('concurrent', 'reviewer2', 'openai', 'gpt-4', 'You review from a business perspective.');
 
     // Group Chat: 2 agents discussing
-    addAgent('group_chat', 'writer', 'openai', 'gpt-4', 'You write content. Include CONSENSUS_REACHED when satisfied.');
-    addAgent('group_chat', 'editor', 'openai', 'gpt-4', 'You edit for clarity.');
+    addAgent('group_chat', 'writer', 'openai', 'gpt-4', 'You write content. Wait for editor feedback before including CONSENSUS_REACHED.');
+    addAgent('group_chat', 'editor', 'openai', 'gpt-4', 'You edit for clarity. Include CONSENSUS_REACHED when the content is polished.');
 
     // Handoff: 2 agents with routing
     addAgent('handoff', 'triage', 'openai', 'gpt-4', 'You triage tasks. Use HANDOFF:agent_id to route.');
@@ -171,8 +171,24 @@ function addAgent(pattern, id, provider, model, prompt) {
         }
     };
 
+    // Auto-update model when provider changes
+    providerSelect.addEventListener('change', () => {
+        const provider = providerSelect.value;
+        const currentModel = modelInput.value;
+
+        // Only auto-update if current model doesn't match provider
+        if (provider === 'anthropic' && currentModel.startsWith('gpt-')) {
+            modelInput.value = 'claude-3-5-sonnet-20241022';
+        } else if (provider === 'openai' && currentModel.startsWith('claude-')) {
+            modelInput.value = 'gpt-4';
+        } else if (provider === 'cohere' && !currentModel.startsWith('command-')) {
+            modelInput.value = 'command-r-plus';
+        }
+
+        updateAgent();
+    });
+
     idInput.addEventListener('input', updateAgent);
-    providerSelect.addEventListener('change', updateAgent);
     modelInput.addEventListener('input', updateAgent);
     promptTextarea.addEventListener('input', updateAgent);
 
