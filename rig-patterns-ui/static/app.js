@@ -220,14 +220,20 @@ function setupEventListeners() {
     // Pattern type change
     document.getElementById('pattern-type').addEventListener('change', updatePatternOptions);
 
-    // Execute button
-    document.getElementById('execute').addEventListener('click', executePattern);
+    // Execute button (removed - using streaming only now)
+    // document.getElementById('execute').addEventListener('click', executePattern);
 
     // Execute with streaming button
     document.getElementById('execute-stream').addEventListener('click', executeWithStreaming);
 
     // Compare all button
     document.getElementById('compare-all').addEventListener('click', compareAllPatterns);
+
+    // Clear conversation button
+    const clearBtn = document.getElementById('clear-conversation');
+    if (clearBtn) {
+        clearBtn.addEventListener('click', clearConversation);
+    }
 
     // Load preset
     document.getElementById('load-preset').addEventListener('change', (e) => {
@@ -236,6 +242,20 @@ function setupEventListeners() {
             loadPreset(presetName);
         }
     });
+}
+
+function clearConversation() {
+    const log = document.getElementById('conversation-log');
+    log.innerHTML = `
+        <div class="log-placeholder">
+            <div class="placeholder-icon">◉</div>
+            <p>AWAITING NEURAL ACTIVITY...</p>
+            <p class="placeholder-sub">Execute a pattern to see agent conversations</p>
+        </div>
+    `;
+
+    const statusList = document.getElementById('agent-status-list');
+    statusList.innerHTML = '<p class="status-placeholder">No active agents</p>';
 }
 
 // ========================================
@@ -328,6 +348,7 @@ async function executeWithStreaming() {
 
     ws.onopen = () => {
         console.log('WebSocket connected');
+        updateWebSocketStatus('connected');
 
         // Initialize visualization for pattern
         initializeStreamingVisualization(state.pattern);
@@ -348,13 +369,36 @@ async function executeWithStreaming() {
 
     ws.onerror = (error) => {
         console.error('WebSocket error:', error);
+        updateWebSocketStatus('error');
         alert('WebSocket connection failed');
     };
 
     ws.onclose = () => {
         console.log('WebSocket closed');
+        updateWebSocketStatus('disconnected');
         state.ws = null;
     };
+}
+
+function updateWebSocketStatus(status) {
+    const statusDot = document.getElementById('ws-status');
+    const statusText = document.getElementById('ws-text');
+
+    if (!statusDot || !statusText) return;
+
+    statusDot.className = 'status-dot';
+    switch (status) {
+        case 'connected':
+            statusDot.classList.add('active');
+            statusText.textContent = 'CONNECTED';
+            break;
+        case 'disconnected':
+            statusText.textContent = 'DISCONNECTED';
+            break;
+        case 'error':
+            statusText.textContent = 'ERROR';
+            break;
+    }
 }
 
 async function compareAllPatterns() {
@@ -500,6 +544,40 @@ function handleStreamingEvent(event) {
     switch (event.type) {
         case 'agent_start':
             updateAgentState(event.agent_id, 'processing');
+            addConversationMessage({
+                agent: event.agent_id,
+                type: 'start',
+                content: 'Agent activated',
+                timestamp: event.timestamp
+            });
+            break;
+
+        case 'agent_receives_input':
+            addConversationMessage({
+                agent: event.agent_id,
+                type: 'input',
+                content: event.input,
+                timestamp: event.timestamp
+            });
+            break;
+
+        case 'agent_thinking':
+            updateAgentState(event.agent_id, 'thinking');
+            addConversationMessage({
+                agent: event.agent_id,
+                type: 'thinking',
+                content: 'Processing...',
+                timestamp: event.timestamp
+            });
+            break;
+
+        case 'agent_responds':
+            addConversationMessage({
+                agent: event.agent_id,
+                type: 'output',
+                content: event.response,
+                timestamp: event.timestamp
+            });
             break;
 
         case 'agent_complete':
@@ -508,6 +586,31 @@ function handleStreamingEvent(event) {
 
         case 'agent_error':
             updateAgentState(event.agent_id, 'error');
+            addConversationMessage({
+                agent: event.agent_id,
+                type: 'error',
+                content: event.error,
+                timestamp: event.timestamp
+            });
+            break;
+
+        case 'agent_handoff':
+            addConversationMessage({
+                agent: event.from_agent,
+                type: 'handoff',
+                content: event.message,
+                toAgent: event.to_agent,
+                timestamp: event.timestamp
+            });
+            break;
+
+        case 'conversation_message':
+            addConversationMessage({
+                agent: event.from,
+                type: event.message_type,
+                content: event.message,
+                timestamp: event.timestamp
+            });
             break;
 
         case 'pattern_step':
@@ -525,6 +628,97 @@ function handleStreamingEvent(event) {
     }
 }
 
+function addConversationMessage(msg) {
+    const log = document.getElementById('conversation-log');
+
+    // Remove placeholder if present
+    const placeholder = log.querySelector('.log-placeholder');
+    if (placeholder) {
+        placeholder.remove();
+    }
+
+    const messageEl = document.createElement('div');
+    messageEl.className = msg.type === 'handoff' ? 'conversation-message handoff-message' : 'conversation-message';
+
+    const header = document.createElement('div');
+    header.className = 'message-header';
+
+    const agentSpan = document.createElement('span');
+    agentSpan.className = 'message-agent';
+    agentSpan.textContent = msg.agent;
+
+    const typeSpan = document.createElement('span');
+    typeSpan.className = `message-type ${msg.type}`;
+    typeSpan.textContent = msg.type.toUpperCase();
+
+    const timestampSpan = document.createElement('span');
+    timestampSpan.className = 'message-timestamp';
+    timestampSpan.textContent = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString() : '';
+
+    header.appendChild(agentSpan);
+    header.appendChild(typeSpan);
+    header.appendChild(timestampSpan);
+
+    const content = document.createElement('div');
+    content.className = 'message-content';
+
+    if (msg.type === 'thinking') {
+        content.innerHTML = '<span class="thinking-indicator"><span class="thinking-dots"></span></span>';
+    } else if (msg.type === 'handoff' && msg.toAgent) {
+        content.innerHTML = `${msg.content}<span class="handoff-arrow">→</span><strong>${msg.toAgent}</strong>`;
+    } else {
+        content.textContent = msg.content;
+    }
+
+    messageEl.appendChild(header);
+    messageEl.appendChild(content);
+    log.appendChild(messageEl);
+
+    // Auto-scroll to bottom
+    log.scrollTop = log.scrollHeight;
+
+    // Update agent status display
+    updateAgentStatusDisplay(msg.agent, msg.type);
+}
+
+function updateAgentStatusDisplay(agentId, status) {
+    const statusList = document.getElementById('agent-status-list');
+
+    // Remove placeholder if present
+    const placeholder = statusList.querySelector('.status-placeholder');
+    if (placeholder) {
+        placeholder.remove();
+    }
+
+    let statusItem = statusList.querySelector(`[data-agent="${agentId}"]`);
+
+    if (!statusItem) {
+        statusItem = document.createElement('div');
+        statusItem.className = 'agent-status-item';
+        statusItem.setAttribute('data-agent', agentId);
+        statusList.appendChild(statusItem);
+    }
+
+    const indicator = document.createElement('span');
+    indicator.className = 'agent-status-indicator';
+
+    switch (status) {
+        case 'thinking':
+            indicator.classList.add('thinking');
+            break;
+        case 'output':
+        case 'completed':
+            indicator.classList.add('complete');
+            break;
+        default:
+            indicator.classList.add('active');
+    }
+
+    statusItem.innerHTML = '';
+    statusItem.appendChild(indicator);
+    statusItem.appendChild(document.createTextNode(agentId));
+}
+
 function updateAgentState(agentId, state) {
     const node = document.getElementById(`agent-${agentId}`);
     if (node) {
@@ -533,6 +727,24 @@ function updateAgentState(agentId, state) {
 }
 
 function addPatternStep(message) {
+    // Add to conversation log
+    const log = document.getElementById('conversation-log');
+
+    // Remove placeholder if present
+    const placeholder = log.querySelector('.log-placeholder');
+    if (placeholder) {
+        placeholder.remove();
+    }
+
+    const stepEl = document.createElement('div');
+    stepEl.className = 'pattern-step';
+    stepEl.textContent = message;
+    log.appendChild(stepEl);
+
+    // Auto-scroll to bottom
+    log.scrollTop = log.scrollHeight;
+
+    // Also add to pattern-specific visualization
     const pattern = state.pattern;
 
     if (pattern === 'group_chat') {
