@@ -519,7 +519,7 @@ function handleExecutionEvent(event) {
                 <span class="log-time">${timestamp}</span>
                 <span class="log-agent">${event.agent_id} (${event.provider})</span>
                 <span class="log-type">RESPONDS</span>
-                <div class="log-content">${escapeHtml(event.response)}</div>
+                <div class="log-content markdown-content">${renderMarkdown(event.response)}</div>
             </div>`;
             break;
 
@@ -544,7 +544,7 @@ function handleExecutionEvent(event) {
                 <span class="log-time">${timestamp}</span>
                 <span class="log-agent">${event.from} (${event.provider})</span>
                 <span class="log-type">${event.message_type.toUpperCase()}</span>
-                <div class="log-content">${escapeHtml(event.message)}</div>
+                <div class="log-content markdown-content">${renderMarkdown(event.message)}</div>
             </div>`;
             break;
 
@@ -552,7 +552,7 @@ function handleExecutionEvent(event) {
             logEntry = `<div class="log-entry complete">
                 <span class="log-time">${timestamp}</span>
                 <span class="log-type">✅ PATTERN COMPLETE</span>
-                <div class="log-content"><strong>Output:</strong> ${escapeHtml(event.output)}</div>
+                <div class="log-content markdown-content"><strong>Output:</strong> ${renderMarkdown(event.output)}</div>
             </div>`;
             updatePatternStatus(patternId, 'completed');
             updateFinalResult(patternId, event.output, 'success');
@@ -616,8 +616,9 @@ function updateFinalResult(patternId, content, resultType) {
 
     // Create result content div
     const resultDiv = document.createElement('div');
-    resultDiv.className = `result-content ${resultType}`;
-    resultDiv.textContent = content;
+    resultDiv.className = `result-content markdown-content ${resultType}`;
+    // Use innerHTML with markdown rendering for rich formatting
+    resultDiv.innerHTML = renderMarkdown(content);
 
     resultContainer.appendChild(resultDiv);
 
@@ -673,4 +674,31 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+// Configure marked for better rendering
+marked.setOptions({
+    breaks: true,  // Convert \n to <br>
+    gfm: true,     // GitHub Flavored Markdown
+    headerIds: false,
+    mangle: false
+});
+
+// Render markdown with XSS protection
+function renderMarkdown(text) {
+    if (!text) return '';
+
+    // Convert markdown to HTML
+    const rawHtml = marked.parse(text);
+
+    // Sanitize HTML to prevent XSS attacks
+    const cleanHtml = DOMPurify.sanitize(rawHtml, {
+        ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 's', 'code', 'pre', 'blockquote',
+                       'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+                       'ul', 'ol', 'li', 'hr', 'a', 'img', 'table', 'thead', 'tbody', 'tr', 'th', 'td'],
+        ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'class'],
+        ALLOW_DATA_ATTR: false
+    });
+
+    return cleanHtml;
 }
