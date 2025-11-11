@@ -119,16 +119,16 @@ async fn execute_all_patterns(
     // Get default agents if not provided per-pattern
     let default_agents = vec![
         AgentConfig {
-            id: "agent1".to_string(),
+            id: "gatherer".to_string(),
             provider: "openai".to_string(),
             model: "gpt-5".to_string(),
-            system_prompt: "You are an Information Gatherer. Your role is to receive a user query, research and gather comprehensive information about the topic, and provide a detailed summary. Focus on extracting key facts, concepts, and context that will be useful for further analysis. Present your findings in a clear, structured format.".to_string(),
+            system_prompt: "You are an Information Researcher and Gatherer. When you receive a query, your mission is to comprehensively research the topic and compile all relevant information. Extract key facts, definitions, historical context, current state, and important nuances. Structure your output with clear sections: Overview, Key Facts, Context, and Details. Your goal is to provide a complete information foundation that enables deep analysis in the next stage. Be thorough and factual.".to_string(),
         },
         AgentConfig {
-            id: "agent2".to_string(),
-            provider: "openai".to_string(),
-            model: "gpt-5".to_string(),
-            system_prompt: "You are an Expert Analyzer. You receive the gathered information from the previous agent and perform deep analysis. Your role is to synthesize insights, identify patterns, draw conclusions, and provide actionable recommendations. Build upon the information provided and add expert-level interpretation.".to_string(),
+            id: "analyzer".to_string(),
+            provider: "anthropic".to_string(),
+            model: "claude-sonnet-4-5-20250929".to_string(),
+            system_prompt: "You are an Expert Analyst and Critical Thinker. You receive researched information from the previous agent and perform sophisticated analysis. Synthesize the information, identify underlying patterns and connections, evaluate implications, assess strengths and limitations, and formulate actionable insights. Provide expert interpretation that goes beyond the raw facts. Structure your output with: Analysis, Key Insights, Implications, and Recommendations. Think deeply and critically.".to_string(),
         },
     ];
 

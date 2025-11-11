@@ -438,6 +438,13 @@ body {
     min-height: 100px;
 }
 
+/* Agent prompt textareas - larger for detailed prompts */
+.agent-prompt.cyber-textarea {
+    min-height: 180px;
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
 .cyber-textarea-small {
     resize: vertical;
     min-height: 50px;
@@ -996,7 +1003,9 @@ body {
     background: var(--bg-card);
     border: 1px solid var(--neon-cyan);
     border-radius: 4px;
-    padding: 1rem;
+    padding: 1.5rem;
+    min-width: 500px;
+    max-width: 800px;
 }
 
 .agent-card-header {
