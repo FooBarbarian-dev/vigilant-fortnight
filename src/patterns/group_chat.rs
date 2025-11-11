@@ -26,15 +26,27 @@ impl GroupChatExecutor {
             || normalized.contains("AGREED")
     }
 
-    /// Build conversation context from history
-    fn build_context(history: &[(String, String)], initial_input: &str) -> String {
-        let mut context = format!("Initial topic: {}\n\nConversation history:\n", initial_input);
+    /// Build conversation context from history with structured format
+    fn build_context(history: &[(String, String)], initial_input: &str, _round: usize, is_last_agent: bool) -> String {
+        let mut context = format!("TOPIC: {}\n\nDISCUSSION HISTORY:\n", initial_input);
 
-        for (agent_id, message) in history {
-            context.push_str(&format!("\n{}: {}\n", agent_id, message));
+        // Track which round each message belongs to (assuming agents speak in order)
+        let agent_count = history.iter().map(|(id, _)| id).collect::<std::collections::HashSet<_>>().len().max(1);
+
+        for (idx, (agent_id, message)) in history.iter().enumerate() {
+            let msg_round = (idx / agent_count) + 1;
+            context.push_str(&format!("\n[Round {}] {}: {}\n", msg_round, agent_id, message));
         }
 
-        context.push_str("\nYour turn to respond. If you believe consensus has been reached, include 'CONSENSUS_REACHED' in your response:");
+        // Add instructions based on agent position
+        if is_last_agent {
+            context.push_str("\n\nYour turn to respond. Reference specific points made by others and either build on them or offer alternative perspectives. ");
+            context.push_str("If you believe we've reached a good conclusion, include 'CONSENSUS_REACHED' in your response.");
+        } else {
+            context.push_str("\n\nYour turn to respond. Reference specific points made by others and either build on them, ");
+            context.push_str("offer alternative perspectives, or ask clarifying questions. Engage directly with what has been said.");
+        }
+
         context
     }
 }
@@ -73,13 +85,21 @@ impl PatternExecutor for GroupChatExecutor {
             metadata.add_trace(format!("--- Round {} ---", round + 1));
 
             // Round-robin: each agent speaks once per round
-            for agent in agents.iter() {
+            for (idx, agent) in agents.iter().enumerate() {
+                let is_last_agent = idx == agents.len() - 1;
+
                 let context = if conversation_history.is_empty() {
-                    // First message gets the original input
-                    format!("{}\n\nPlease provide your perspective. If consensus is reached, include 'CONSENSUS_REACHED' in your response.", input)
+                    // First message gets the original input with clear instructions
+                    format!(
+                        "TOPIC: {}\n\n\
+                        You are participating in a group discussion with other agents. \
+                        Please provide your initial perspective on this topic. \
+                        Be thoughtful and set the stage for a productive discussion.",
+                        input
+                    )
                 } else {
-                    // Subsequent messages get conversation history
-                    Self::build_context(&conversation_history, input)
+                    // Subsequent messages get structured conversation history
+                    Self::build_context(&conversation_history, input, round + 1, is_last_agent)
                 };
 
                 tracing::debug!(
@@ -135,20 +155,29 @@ impl PatternExecutor for GroupChatExecutor {
         metadata.add_detail("consensus_reached", consensus_reached.to_string());
         metadata.add_detail("messages_exchanged", conversation_history.len().to_string());
 
-        // Build final output: full conversation + last message
-        let mut output = String::from("GROUP CHAT CONVERSATION:\n\n");
-        for (agent_id, message) in &conversation_history {
-            output.push_str(&format!("{}: {}\n\n", agent_id, message));
+        // Build final output with structured format
+        let mut output = format!("# GROUP CHAT DISCUSSION\n\n**Topic:** {}\n\n## Conversation\n", input);
+
+        // Calculate rounds and format conversation by round
+        let agents_per_round = agents.len();
+        for (idx, (agent_id, message)) in conversation_history.iter().enumerate() {
+            let msg_round = (idx / agents_per_round) + 1;
+            output.push_str(&format!("\n**[Round {}] {}:**\n\n{}\n", msg_round, agent_id, message));
         }
 
-        output.push_str("\n--- FINAL MESSAGE ---\n");
-        if let Some((agent_id, last_message)) = conversation_history.last() {
-            output.push_str(&format!("From {}: {}", agent_id, last_message));
-        }
-
+        // Add conclusion
+        output.push_str("\n---\n\n");
         if consensus_reached {
+            output.push_str(&format!(
+                "✅ **Consensus reached** after {} rounds with {} participants\n",
+                rounds_completed, agents.len()
+            ));
             metadata.add_trace("Group chat ended with consensus".to_string());
         } else {
+            output.push_str(&format!(
+                "⏱️ **Discussion ended** after {} rounds (maximum reached)\n",
+                self.max_rounds
+            ));
             metadata.add_trace(format!(
                 "Group chat ended after {} rounds (max reached)",
                 self.max_rounds

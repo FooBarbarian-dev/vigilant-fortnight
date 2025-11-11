@@ -407,7 +407,9 @@ where
         PatternConfig::GroupChat { max_rounds } => {
             tracing::info!("[{}] Starting GROUP_CHAT pattern with {} agents", pattern_id, agents.len());
             let rounds = *max_rounds;
-            let mut conversation_history = format!("Initial prompt: {}", input);
+
+            // Store conversation as structured turns: Vec<(round, agent_id, message)>
+            let mut conversation_turns: Vec<(usize, String, String)> = Vec::new();
 
             for round in 1..=rounds {
                 sender.send(ExecutionEvent::PatternStep {
@@ -419,13 +421,49 @@ where
                 for (idx, agent) in agents.iter().enumerate() {
                     let agent_id = agent.id();
                     let provider = get_provider(agent_id);
+                    let is_first_message = conversation_turns.is_empty();
                     let is_last_agent = idx == agents.len() - 1;
+
+                    // Build structured conversation context
+                    let prompt = if is_first_message {
+                        // First agent in first round: introduce the topic
+                        format!(
+                            "TOPIC: {}\n\n\
+                            You are participating in a group discussion with other agents. \
+                            Please provide your initial perspective on this topic. \
+                            Be thoughtful and set the stage for a productive discussion.",
+                            input
+                        )
+                    } else {
+                        // Build conversation history with clear structure
+                        let mut context = format!("TOPIC: {}\n\nDISCUSSION HISTORY:\n", input);
+
+                        for (r, speaker, msg) in &conversation_turns {
+                            context.push_str(&format!("\n[Round {}] {}: {}\n", r, speaker, msg));
+                        }
+
+                        // Instructions for responding
+                        let instructions = if is_last_agent && round == rounds {
+                            "\n\nYour turn to respond. This is the final round - please provide a concluding response. \
+                            Reference specific points made by others and either build on them or offer alternative perspectives. \
+                            If you believe we've reached a good conclusion, include 'CONSENSUS_REACHED' in your response."
+                        } else if is_last_agent {
+                            "\n\nYour turn to respond. Reference specific points made by others and either build on them or offer alternative perspectives. \
+                            If you believe we've reached a good conclusion, include 'CONSENSUS_REACHED' in your response."
+                        } else {
+                            "\n\nYour turn to respond. Reference specific points made by others and either build on them, \
+                            offer alternative perspectives, or ask clarifying questions. Engage directly with what has been said."
+                        };
+
+                        context.push_str(instructions);
+                        context
+                    };
 
                     sender.send(ExecutionEvent::AgentReceivesInput {
                         pattern_id: pattern_id.clone(),
                         agent_id: agent_id.to_string(),
                         provider: provider.clone(),
-                        input: conversation_history.clone(),
+                        input: prompt.clone(),
                         timestamp: chrono::Utc::now().to_rfc3339(),
                     }).await?;
 
@@ -437,12 +475,6 @@ where
                     }).await?;
 
                     // *** REAL LLM CALL WITH TIMEOUT ***
-                    // Only the last agent can trigger consensus to ensure all agents participate
-                    let prompt = if is_last_agent {
-                        format!("{}\n\nRespond to the discussion. You can include CONSENSUS_REACHED in your response if you believe we've reached a good conclusion.", conversation_history)
-                    } else {
-                        format!("{}\n\nRespond to the discussion.", conversation_history)
-                    };
                     let response = call_agent_with_timeout(agent, &prompt, agent_id).await?;
 
                     sender.send(ExecutionEvent::ConversationMessage {
@@ -458,18 +490,28 @@ where
                         timestamp: chrono::Utc::now().to_rfc3339(),
                     }).await?;
 
-                    conversation_history.push_str(&format!("\n{}: {}", agent_id, response));
+                    // Add turn to history
+                    conversation_turns.push((round, agent_id.to_string(), response.clone()));
 
                     // Check for consensus
                     if response.contains("CONSENSUS_REACHED") {
                         tracing::info!("[{}] Consensus reached at round {}", pattern_id, round);
+
+                        // Build final output with structured format
+                        let mut final_output = format!("GROUP CHAT DISCUSSION\n\nTopic: {}\n\nConversation:\n", input);
+                        for (r, speaker, msg) in &conversation_turns {
+                            final_output.push_str(&format!("\n[Round {}] **{}**: {}\n", r, speaker, msg));
+                        }
+                        final_output.push_str(&format!("\n✅ Consensus reached after {} rounds with {} participants", round, agents.len()));
+
                         sender.send(ExecutionEvent::PatternComplete {
                             pattern_id: pattern_id.clone(),
-                            output: conversation_history,
+                            output: final_output,
                             metadata: serde_json::json!({
                                 "pattern": "group_chat",
                                 "rounds": round,
                                 "participants": agents.len(),
+                                "consensus": true,
                             }),
                             timestamp: chrono::Utc::now().to_rfc3339(),
                         }).await?;
@@ -480,13 +522,21 @@ where
 
             tracing::info!("[{}] Group chat completed after {} rounds", pattern_id, rounds);
 
+            // Build final output with structured format
+            let mut final_output = format!("GROUP CHAT DISCUSSION\n\nTopic: {}\n\nConversation:\n", input);
+            for (r, speaker, msg) in &conversation_turns {
+                final_output.push_str(&format!("\n[Round {}] **{}**: {}\n", r, speaker, msg));
+            }
+            final_output.push_str(&format!("\n⏱️ Discussion ended after {} rounds (maximum reached)", rounds));
+
             sender.send(ExecutionEvent::PatternComplete {
                 pattern_id: pattern_id.clone(),
-                output: conversation_history,
+                output: final_output,
                 metadata: serde_json::json!({
                     "pattern": "group_chat",
                     "rounds": rounds,
                     "participants": agents.len(),
+                    "consensus": false,
                 }),
                 timestamp: chrono::Utc::now().to_rfc3339(),
             }).await?;
