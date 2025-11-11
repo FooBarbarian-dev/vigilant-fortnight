@@ -1004,8 +1004,8 @@ body {
     border: 1px solid var(--neon-cyan);
     border-radius: 4px;
     padding: 1.5rem;
-    min-width: 500px;
-    max-width: 800px;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .agent-card-header {
