@@ -26,29 +26,6 @@ impl GroupChatExecutor {
             || normalized.contains("AGREED")
     }
 
-    /// Build conversation context from history with structured format
-    fn build_context(history: &[(String, String)], initial_input: &str, _round: usize, is_last_agent: bool) -> String {
-        let mut context = format!("TOPIC: {}\n\nDISCUSSION HISTORY:\n", initial_input);
-
-        // Track which round each message belongs to (assuming agents speak in order)
-        let agent_count = history.iter().map(|(id, _)| id).collect::<std::collections::HashSet<_>>().len().max(1);
-
-        for (idx, (agent_id, message)) in history.iter().enumerate() {
-            let msg_round = (idx / agent_count) + 1;
-            context.push_str(&format!("\n[Round {}] {}: {}\n", msg_round, agent_id, message));
-        }
-
-        // Add instructions based on agent position
-        if is_last_agent {
-            context.push_str("\n\nYour turn to respond. Reference specific points made by others and either build on them or offer alternative perspectives. ");
-            context.push_str("If you believe we've reached a good conclusion, include 'CONSENSUS_REACHED' in your response.");
-        } else {
-            context.push_str("\n\nYour turn to respond. Reference specific points made by others and either build on them, ");
-            context.push_str("offer alternative perspectives, or ask clarifying questions. Engage directly with what has been said.");
-        }
-
-        context
-    }
 }
 
 #[async_trait]
@@ -82,60 +59,80 @@ impl PatternExecutor for GroupChatExecutor {
         let mut consensus_reached = false;
 
         for round in 0..self.max_rounds {
-            metadata.add_trace(format!("--- Round {} ---", round + 1));
+            metadata.add_trace(format!("--- Round {} (parallel execution) ---", round + 1));
 
-            // Round-robin: each agent speaks once per round
-            for (idx, agent) in agents.iter().enumerate() {
-                let is_last_agent = idx == agents.len() - 1;
+            // Build context once - all agents see the same history at round start
+            let base_context = if conversation_history.is_empty() {
+                format!(
+                    "TOPIC: {}\n\n\
+                    You are participating in a group discussion with other agents. \
+                    Please provide your initial perspective on this topic. \
+                    Be thoughtful and contribute to a productive discussion.",
+                    input
+                )
+            } else {
+                let mut context = format!("TOPIC: {}\n\nDISCUSSION HISTORY:\n", input);
 
-                let context = if conversation_history.is_empty() {
-                    // First message gets the original input with clear instructions
-                    format!(
-                        "TOPIC: {}\n\n\
-                        You are participating in a group discussion with other agents. \
-                        Please provide your initial perspective on this topic. \
-                        Be thoughtful and set the stage for a productive discussion.",
-                        input
-                    )
+                // Calculate which round each message belongs to
+                let agents_per_round = agents.len();
+                for (idx, (agent_id, message)) in conversation_history.iter().enumerate() {
+                    let msg_round = (idx / agents_per_round) + 1;
+                    context.push_str(&format!("\n[Round {}] {}: {}\n", msg_round, agent_id, message));
+                }
+
+                if round + 1 == self.max_rounds {
+                    context.push_str("\n\nYour turn to respond. This is the final round - reference specific points made by others. If you believe we've reached a good conclusion, include 'CONSENSUS_REACHED' in your response.");
                 } else {
-                    // Subsequent messages get structured conversation history
-                    Self::build_context(&conversation_history, input, round + 1, is_last_agent)
-                };
+                    context.push_str("\n\nYour turn to respond. Reference specific points made by others and engage with what has been said.");
+                }
+                context
+            };
+
+            // Spawn all agents in parallel for this round
+            let mut tasks = Vec::new();
+            for agent in agents.iter() {
+                let agent_id = agent.id().to_string();
+                let context_clone = base_context.clone();
+                let agent_clone = agent.clone();
 
                 tracing::debug!(
                     round = round + 1,
-                    agent_id = %agent.id(),
-                    "GroupChat: prompting agent"
+                    agent_id = %agent_id,
+                    "GroupChat: spawning agent task (parallel)"
                 );
 
-                let response = agent.prompt(&context).await.map_err(|e| {
-                    anyhow::anyhow!(
-                        "Agent '{}' failed in round {}: {}",
-                        agent.id(),
-                        round + 1,
-                        e
-                    )
-                })?;
+                tasks.push(tokio::spawn(async move {
+                    let response = agent_clone.prompt(&context_clone).await.map_err(|e| {
+                        anyhow::anyhow!("Agent '{}' failed: {}", agent_id, e)
+                    })?;
+                    Ok::<(String, String), anyhow::Error>((agent_id, response))
+                }));
+            }
+
+            // Wait for all agents to complete
+            for task in tasks {
+                let (agent_id, response) = task.await.map_err(|e| {
+                    anyhow::anyhow!("Task join error: {}", e)
+                })??;
 
                 metadata.add_trace(format!(
                     "Round {}: {} said: {}",
                     round + 1,
-                    agent.id(),
+                    agent_id,
                     response.chars().take(100).collect::<String>()
                         + if response.len() > 100 { "..." } else { "" }
                 ));
 
-                conversation_history.push((agent.id().to_string(), response.clone()));
+                conversation_history.push((agent_id.clone(), response.clone()));
 
                 // Check for consensus
                 if Self::check_consensus(&response) {
                     metadata.add_trace(format!(
                         "Consensus detected from agent '{}' in round {}",
-                        agent.id(),
+                        agent_id,
                         round + 1
                     ));
                     consensus_reached = true;
-                    break;
                 }
             }
 
