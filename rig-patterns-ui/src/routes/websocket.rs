@@ -121,13 +121,13 @@ async fn execute_all_patterns(
         AgentConfig {
             id: "agent1".to_string(),
             provider: "openai".to_string(),
-            model: "gpt-4".to_string(),
+            model: "gpt-5".to_string(),
             system_prompt: "You are a helpful AI assistant.".to_string(),
         },
         AgentConfig {
             id: "agent2".to_string(),
             provider: "openai".to_string(),
-            model: "gpt-4".to_string(),
+            model: "gpt-5".to_string(),
             system_prompt: "You are an expert analyzer.".to_string(),
         },
     ];

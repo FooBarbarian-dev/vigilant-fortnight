@@ -55,24 +55,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function initializeDefaultAgents() {
     // Sequential: 2 agents in chain
-    addAgent('sequential', 'agent1', 'openai', 'gpt-4', 'You are a helpful AI assistant.');
-    addAgent('sequential', 'agent2', 'openai', 'gpt-4', 'You are an expert analyzer.');
+    addAgent('sequential', 'agent1', 'openai', 'gpt-5', 'You are a helpful AI assistant.');
+    addAgent('sequential', 'agent2', 'openai', 'gpt-5', 'You are an expert analyzer.');
 
     // Concurrent: 2 agents in parallel
-    addAgent('concurrent', 'reviewer1', 'openai', 'gpt-4', 'You review from a technical perspective.');
-    addAgent('concurrent', 'reviewer2', 'openai', 'gpt-4', 'You review from a business perspective.');
+    addAgent('concurrent', 'reviewer1', 'openai', 'gpt-5', 'You review from a technical perspective.');
+    addAgent('concurrent', 'reviewer2', 'openai', 'gpt-5', 'You review from a business perspective.');
 
     // Group Chat: 2 agents discussing
-    addAgent('group_chat', 'writer', 'openai', 'gpt-4', 'You write content. Wait for editor feedback before including CONSENSUS_REACHED.');
-    addAgent('group_chat', 'editor', 'openai', 'gpt-4', 'You edit for clarity. Include CONSENSUS_REACHED when the content is polished.');
+    addAgent('group_chat', 'writer', 'openai', 'gpt-5', 'You write content. Wait for editor feedback before including CONSENSUS_REACHED.');
+    addAgent('group_chat', 'editor', 'openai', 'gpt-5', 'You edit for clarity. Include CONSENSUS_REACHED when the content is polished.');
 
     // Handoff: 2 agents with routing
-    addAgent('handoff', 'triage', 'openai', 'gpt-4', 'You triage tasks. Use HANDOFF:agent_id to route.');
-    addAgent('handoff', 'specialist', 'openai', 'gpt-4', 'You handle specialized tasks.');
+    addAgent('handoff', 'triage', 'openai', 'gpt-5', 'You triage tasks. Use HANDOFF:agent_id to route.');
+    addAgent('handoff', 'specialist', 'openai', 'gpt-5', 'You handle specialized tasks.');
 
     // Magentic: Manager + Worker
-    addAgent('magentic', 'manager', 'openai', 'gpt-4', 'You are a project manager who breaks down tasks.');
-    addAgent('magentic', 'worker', 'openai', 'gpt-4', 'You complete assigned tasks efficiently.');
+    addAgent('magentic', 'manager', 'openai', 'gpt-5', 'You are a project manager who breaks down tasks.');
+    addAgent('magentic', 'worker', 'openai', 'gpt-5', 'You complete assigned tasks efficiently.');
 }
 
 // ========================================
@@ -96,7 +96,7 @@ function setupEventListeners() {
         btn.addEventListener('click', () => {
             const pattern = btn.dataset.pattern;
             const agentNum = state.patterns[pattern].length + 1;
-            addAgent(pattern, `agent${agentNum}`, 'openai', 'gpt-4', 'You are a helpful assistant.');
+            addAgent(pattern, `agent${agentNum}`, 'openai', 'gpt-5', 'You are a helpful assistant.');
             renderDAG(pattern);
         });
     });
@@ -178,9 +178,9 @@ function addAgent(pattern, id, provider, model, prompt) {
 
         // Only auto-update if current model doesn't match provider
         if (provider === 'anthropic' && currentModel.startsWith('gpt-')) {
-            modelInput.value = 'claude-3-5-sonnet-20240620';
+            modelInput.value = 'claude-sonnet-4-5-20250929';
         } else if (provider === 'openai' && currentModel.startsWith('claude-')) {
-            modelInput.value = 'gpt-4';
+            modelInput.value = 'gpt-5';
         } else if (provider === 'cohere' && !currentModel.startsWith('command-')) {
             modelInput.value = 'command-r-plus';
         }
