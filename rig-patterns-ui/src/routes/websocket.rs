@@ -122,13 +122,13 @@ async fn execute_all_patterns(
             id: "agent1".to_string(),
             provider: "openai".to_string(),
             model: "gpt-5".to_string(),
-            system_prompt: "You are a helpful AI assistant.".to_string(),
+            system_prompt: "You are an Information Gatherer. Your role is to receive a user query, research and gather comprehensive information about the topic, and provide a detailed summary. Focus on extracting key facts, concepts, and context that will be useful for further analysis. Present your findings in a clear, structured format.".to_string(),
         },
         AgentConfig {
             id: "agent2".to_string(),
             provider: "openai".to_string(),
             model: "gpt-5".to_string(),
-            system_prompt: "You are an expert analyzer.".to_string(),
+            system_prompt: "You are an Expert Analyzer. You receive the gathered information from the previous agent and perform deep analysis. Your role is to synthesize insights, identify patterns, draw conclusions, and provide actionable recommendations. Build upon the information provided and add expert-level interpretation.".to_string(),
         },
     ];
 

@@ -54,6 +54,7 @@ impl Agent {
         let response_text = match &self.model {
             ModelProvider::OpenAI(model) => {
                 let request = CompletionRequestBuilder::new(model.clone(), full_prompt)
+                    .temperature(1.0) // GPT-5 requires explicit temperature (default is 1.0)
                     .build();
                 let response = model.completion(request).await
                     .map_err(|e| anyhow::anyhow!("OpenAI completion failed: {}", e))?;

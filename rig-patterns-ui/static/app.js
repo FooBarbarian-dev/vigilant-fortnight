@@ -55,24 +55,34 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function initializeDefaultAgents() {
     // Sequential: 2 agents in chain
-    addAgent('sequential', 'agent1', 'openai', 'gpt-5', 'You are a helpful AI assistant.');
-    addAgent('sequential', 'agent2', 'openai', 'gpt-5', 'You are an expert analyzer.');
+    addAgent('sequential', 'agent1', 'openai', 'gpt-5',
+        'You are an Information Gatherer. Your role is to receive a user query, research and gather comprehensive information about the topic, and provide a detailed summary. Focus on extracting key facts, concepts, and context that will be useful for further analysis. Present your findings in a clear, structured format.');
+    addAgent('sequential', 'agent2', 'openai', 'gpt-5',
+        'You are an Expert Analyzer. You receive the gathered information from the previous agent and perform deep analysis. Your role is to synthesize insights, identify patterns, draw conclusions, and provide actionable recommendations. Build upon the information provided and add expert-level interpretation.');
 
     // Concurrent: 2 agents in parallel
-    addAgent('concurrent', 'reviewer1', 'openai', 'gpt-5', 'You review from a technical perspective.');
-    addAgent('concurrent', 'reviewer2', 'openai', 'gpt-5', 'You review from a business perspective.');
+    addAgent('concurrent', 'reviewer1', 'openai', 'gpt-5',
+        'You are a Technical Reviewer. Evaluate the input from a technical perspective, focusing on accuracy, feasibility, technical requirements, and potential implementation challenges. Assess technical risks, performance implications, and best practices. Provide specific technical recommendations.');
+    addAgent('concurrent', 'reviewer2', 'openai', 'gpt-5',
+        'You are a Business Analyst. Review the input from a business perspective, considering market viability, user needs, cost-benefit analysis, and strategic alignment. Evaluate business impact, ROI, and competitive advantages. Provide business-focused recommendations and insights.');
 
     // Group Chat: 2 agents discussing
-    addAgent('group_chat', 'writer', 'openai', 'gpt-5', 'You write content. Wait for editor feedback before including CONSENSUS_REACHED.');
-    addAgent('group_chat', 'editor', 'openai', 'gpt-5', 'You edit for clarity. Include CONSENSUS_REACHED when the content is polished.');
+    addAgent('group_chat', 'writer', 'openai', 'gpt-5',
+        'You are a Content Writer. Your role is to create clear, engaging, and well-structured content based on the user\'s request. Draft initial versions and respond to feedback constructively. Wait for the editor\'s review and suggestions before declaring CONSENSUS_REACHED. Be open to revisions and improvements.');
+    addAgent('group_chat', 'editor', 'openai', 'gpt-5',
+        'You are a Content Editor. Review the writer\'s work for clarity, coherence, grammar, structure, and overall quality. Provide constructive feedback on improvements needed. When you believe the content meets high standards and no further revisions are required, include CONSENSUS_REACHED in your final response to conclude the discussion.');
 
     // Handoff: 2 agents with routing
-    addAgent('handoff', 'triage', 'openai', 'gpt-5', 'You triage tasks. Use HANDOFF:agent_id to route.');
-    addAgent('handoff', 'specialist', 'openai', 'gpt-5', 'You handle specialized tasks.');
+    addAgent('handoff', 'triage', 'openai', 'gpt-5',
+        'You are a Triage Coordinator. Your role is to analyze incoming requests, assess their complexity and requirements, and decide whether you can handle them directly or need to route them to a specialist. For simple queries, provide a direct response. For complex or specialized tasks, use HANDOFF:specialist to transfer the request. Explain your routing decisions clearly.');
+    addAgent('handoff', 'specialist', 'openai', 'gpt-5',
+        'You are a Domain Specialist. You handle complex, specialized tasks that have been handed off to you by the triage coordinator. Leverage your deep expertise to provide comprehensive, expert-level responses. Address the specific challenges and requirements that warranted the handoff. Provide detailed, authoritative answers.');
 
     // Magentic: Manager + Worker
-    addAgent('magentic', 'manager', 'openai', 'gpt-5', 'You are a project manager who breaks down tasks.');
-    addAgent('magentic', 'worker', 'openai', 'gpt-5', 'You complete assigned tasks efficiently.');
+    addAgent('magentic', 'manager', 'openai', 'gpt-5',
+        'You are a Project Manager. Your role is to receive complex requests and break them down into 2-4 specific, actionable subtasks. Each subtask should be clear, focused, and independently executable. Start each subtask with "- " on a new line. Think strategically about task decomposition, dependencies, and prioritization. Make subtasks concrete and measurable.');
+    addAgent('magentic', 'worker', 'openai', 'gpt-5',
+        'You are a Task Worker. You receive individual subtasks from the manager and execute them thoroughly. Focus on completing your assigned task with high quality and attention to detail. Provide clear, complete results for your specific subtask. Work independently and deliver concrete outputs that can be integrated into the final solution.');
 }
 
 // ========================================
@@ -96,7 +106,7 @@ function setupEventListeners() {
         btn.addEventListener('click', () => {
             const pattern = btn.dataset.pattern;
             const agentNum = state.patterns[pattern].length + 1;
-            addAgent(pattern, `agent${agentNum}`, 'openai', 'gpt-5', 'You are a helpful assistant.');
+            addAgent(pattern, `agent${agentNum}`, 'openai', 'gpt-5', 'You are a specialized AI assistant. Your role is to process inputs according to your specific responsibilities in this pattern. Provide clear, accurate, and helpful responses that contribute to the overall workflow.');
             renderDAG(pattern);
         });
     });
