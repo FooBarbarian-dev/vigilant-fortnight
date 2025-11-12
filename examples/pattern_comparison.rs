@@ -51,7 +51,7 @@ async fn main() -> Result<()> {
         ),
         (
             "GroupChat",
-            Pattern::GroupChat { max_rounds: 5 },
+            Pattern::GroupChat { max_rounds: 5, resolution: rig_patterns::ResolutionStrategy::Consensus },
             "Use when: Agents should debate and refine ideas through conversation",
             "Behavior: Agents take turns responding to each other's messages",
         ),
