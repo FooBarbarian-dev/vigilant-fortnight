@@ -370,26 +370,48 @@ where
                 }));
             }
 
-            // Wait for all responses
+            // Wait for all responses - collect both successes and failures
             let mut responses = Vec::new();
+            let mut had_errors = false;
             for task in tasks {
-                let (agent_id, response) = task.await??;
-                let provider = get_provider(&agent_id);
+                match task.await {
+                    Ok(Ok((agent_id, response))) => {
+                        let provider = get_provider(&agent_id);
 
-                sender.send(ExecutionEvent::AgentResponds {
-                    pattern_id: pattern_id.clone(),
-                    agent_id: agent_id.clone(),
-                    provider: provider.clone(),
-                    response: response.clone(),
-                    timestamp: chrono::Utc::now().to_rfc3339(),
-                }).await?;
+                        sender.send(ExecutionEvent::AgentResponds {
+                            pattern_id: pattern_id.clone(),
+                            agent_id: agent_id.clone(),
+                            provider: provider.clone(),
+                            response: response.clone(),
+                            timestamp: chrono::Utc::now().to_rfc3339(),
+                        }).await?;
 
-                responses.push(response);
+                        responses.push(response);
+                    }
+                    Ok(Err(e)) => {
+                        tracing::error!("[{}] Agent task failed: {}", pattern_id, e);
+                        had_errors = true;
+                    }
+                    Err(e) => {
+                        tracing::error!("[{}] Agent task panicked: {}", pattern_id, e);
+                        had_errors = true;
+                    }
+                }
+            }
+
+            // If all agents failed, return error
+            if responses.is_empty() {
+                return Err(anyhow::anyhow!("All agents failed in concurrent pattern"));
+            }
+
+            // Log if there were partial failures
+            if had_errors {
+                tracing::warn!("[{}] Concurrent pattern completed with {} successes and some failures", pattern_id, responses.len());
             }
 
             sender.send(ExecutionEvent::PatternStep {
                 pattern_id: pattern_id.clone(),
-                message: format!("Aggregating results using {:?} strategy...", aggregation),
+                message: format!("Aggregating {} results using {:?} strategy...", responses.len(), aggregation),
                 timestamp: chrono::Utc::now().to_rfc3339(),
             }).await?;
 
@@ -482,31 +504,42 @@ where
                     }));
                 }
 
-                // Wait for all agents to respond in parallel
+                // Wait for all agents to respond in parallel - collect both successes and failures
                 let mut consensus_reached = false;
                 for task in tasks {
-                    let (agent_id, response) = task.await??;
-                    let provider = get_provider(&agent_id);
+                    match task.await {
+                        Ok(Ok((agent_id, response))) => {
+                            let provider = get_provider(&agent_id);
 
-                    sender.send(ExecutionEvent::ConversationMessage {
-                        pattern_id: pattern_id.clone(),
-                        from: agent_id.clone(),
-                        provider: provider.clone(),
-                        message: response.clone(),
-                        message_type: if response.contains("CONSENSUS_REACHED") {
-                            "consensus".to_string()
-                        } else {
-                            "output".to_string()
-                        },
-                        timestamp: chrono::Utc::now().to_rfc3339(),
-                    }).await?;
+                            sender.send(ExecutionEvent::ConversationMessage {
+                                pattern_id: pattern_id.clone(),
+                                from: agent_id.clone(),
+                                provider: provider.clone(),
+                                message: response.clone(),
+                                message_type: if response.contains("CONSENSUS_REACHED") {
+                                    "consensus".to_string()
+                                } else {
+                                    "output".to_string()
+                                },
+                                timestamp: chrono::Utc::now().to_rfc3339(),
+                            }).await?;
 
-                    // Add turn to history
-                    conversation_turns.push((round, agent_id.to_string(), response.clone()));
+                            // Add turn to history
+                            conversation_turns.push((round, agent_id.to_string(), response.clone()));
 
-                    // Check for consensus
-                    if response.contains("CONSENSUS_REACHED") {
-                        consensus_reached = true;
+                            // Check for consensus
+                            if response.contains("CONSENSUS_REACHED") {
+                                consensus_reached = true;
+                            }
+                        }
+                        Ok(Err(e)) => {
+                            tracing::error!("[{}] Agent task failed in round {}: {}", pattern_id, round, e);
+                            // Continue with other agents in this round
+                        }
+                        Err(e) => {
+                            tracing::error!("[{}] Agent task panicked in round {}: {}", pattern_id, round, e);
+                            // Continue with other agents in this round
+                        }
                     }
                 }
 
