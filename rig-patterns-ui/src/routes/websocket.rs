@@ -158,8 +158,14 @@ async fn execute_all_patterns(
         let pattern_id = pattern_id.to_string();
         let task = tokio::spawn(async move {
             tracing::info!("[{}] Starting pattern execution", pattern_id);
-            if let Err(e) = execute_pattern_to_channel(tx, pattern_id.clone(), agents, pattern_config, input).await {
+            if let Err(e) = execute_pattern_to_channel(tx.clone(), pattern_id.clone(), agents, pattern_config, input).await {
                 tracing::error!("[{}] Pattern execution failed: {}", pattern_id, e);
+                // Send error event so the frontend doesn't hang waiting for completion
+                let _ = tx.send(ExecutionEvent::PatternError {
+                    pattern_id: pattern_id.clone(),
+                    error: e.to_string(),
+                    timestamp: chrono::Utc::now().to_rfc3339(),
+                });
             }
         });
         tasks.push(task);

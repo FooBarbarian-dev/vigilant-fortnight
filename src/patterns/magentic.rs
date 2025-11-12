@@ -36,10 +36,6 @@ impl SimpleLedger {
             .filter(|t| !self.completed.contains(*t))
             .collect()
     }
-
-    fn all_complete(&self) -> bool {
-        self.tasks.iter().all(|t| self.completed.contains(t))
-    }
 }
 
 /// Magentic pattern executor
@@ -85,33 +81,6 @@ impl MagenticExecutor {
             || upper.contains("DONE")
             || upper.contains("FINISHED")
             || upper.contains("ALL TASKS COMPLETE")
-    }
-
-    /// Find the best worker for a task (simple heuristic based on system prompt)
-    fn assign_worker<'a>(task: &str, workers: &'a [&'a Agent]) -> Option<&'a Agent> {
-        // Simple heuristic: match keywords in task to system prompts
-        let task_lower = task.to_lowercase();
-
-        for worker in workers {
-            let prompt_lower = worker.system_prompt().to_lowercase();
-
-            // Check if worker's specialty matches task keywords
-            if task_lower.contains("summar") && prompt_lower.contains("summar") {
-                return Some(worker);
-            }
-            if task_lower.contains("analyz") && prompt_lower.contains("analyz") {
-                return Some(worker);
-            }
-            if task_lower.contains("write") && prompt_lower.contains("write") {
-                return Some(worker);
-            }
-            if task_lower.contains("review") && prompt_lower.contains("review") {
-                return Some(worker);
-            }
-        }
-
-        // Default to first worker
-        workers.first().copied()
     }
 }
 
@@ -180,53 +149,76 @@ impl PatternExecutor for MagenticExecutor {
 
         metadata.add_detail("tasks_created", tasks.len().to_string());
 
-        // Step 2: Execute tasks iteratively
-        for iteration in 0..self.max_iterations {
-            metadata.add_trace(format!("--- Iteration {} ---", iteration + 1));
+        // Step 2: Execute tasks in parallel batches using threads
+        // Process all tasks at once if we have enough workers, otherwise batch them
+        let pending = ledger.pending_tasks();
+        let tasks_to_process: Vec<String> = pending.iter()
+            .take(self.max_iterations)
+            .map(|s| s.to_string())
+            .collect();
 
-            let pending = ledger.pending_tasks();
-            if pending.is_empty() {
-                metadata.add_trace("All tasks complete".to_string());
-                break;
+        metadata.add_trace(format!("Processing {} tasks in parallel with threads", tasks_to_process.len()));
+
+        if !tasks_to_process.is_empty() && !workers.is_empty() {
+            // Spawn threads for all tasks
+            let mut thread_handles = Vec::new();
+
+            for (idx, task) in tasks_to_process.iter().enumerate() {
+                let task_clone = task.clone();
+                let worker = workers[idx % workers.len()].clone();
+                let worker_id = worker.id().to_string();
+
+                metadata.add_trace(format!("Spawning thread for task: {} -> worker: {}", task, worker_id));
+
+                let handle = std::thread::spawn(move || {
+                    tracing::debug!(
+                        task = %task_clone,
+                        worker_id = %worker_id,
+                        "Magentic: worker executing task in thread"
+                    );
+
+                    // Create a tokio runtime in this thread for the async agent call
+                    let rt = tokio::runtime::Runtime::new()
+                        .map_err(|e| anyhow::anyhow!("Failed to create runtime: {}", e))?;
+
+                    let result = rt.block_on(async {
+                        worker.prompt(&task_clone).await
+                    });
+
+                    Ok::<(String, String, anyhow::Result<String>), anyhow::Error>((
+                        task_clone,
+                        worker_id,
+                        result
+                    ))
+                });
+
+                thread_handles.push(handle);
             }
 
-            metadata.add_trace(format!("Pending tasks: {}", pending.len()));
-
-            // Work on first pending task
-            let task = pending[0].clone();
-            metadata.add_trace(format!("Working on: {}", task));
-
-            // Assign to appropriate worker
-            if let Some(worker) = Self::assign_worker(&task, &workers) {
-                metadata.add_trace(format!("Assigned to worker: {}", worker.id()));
-
-                tracing::debug!(
-                    iteration = iteration + 1,
-                    task = %task,
-                    worker_id = %worker.id(),
-                    "Magentic: worker executing task"
-                );
-
-                match worker.prompt(&task).await {
-                    Ok(result) => {
+            // Collect results from all threads
+            for handle in thread_handles {
+                match handle.join() {
+                    Ok(Ok((task, worker_id, Ok(result)))) => {
                         metadata.add_trace(format!(
-                            "Worker '{}' completed task ({} chars)",
-                            worker.id(),
+                            "Worker '{}' completed task '{}' ({} chars)",
+                            worker_id,
+                            task,
                             result.len()
                         ));
                         task_results.push((task.clone(), result));
                         ledger.complete_task(&task);
                     }
-                    Err(e) => {
-                        metadata.add_trace(format!("Worker '{}' failed: {}", worker.id(), e));
+                    Ok(Ok((task, worker_id, Err(e)))) => {
+                        metadata.add_trace(format!("Worker '{}' failed on task '{}': {}", worker_id, task, e));
                         // Continue with other tasks
                     }
+                    Ok(Err(e)) => {
+                        metadata.add_trace(format!("Thread setup error: {}", e));
+                    }
+                    Err(_) => {
+                        metadata.add_trace("Thread panicked".to_string());
+                    }
                 }
-            }
-
-            // Check if manager thinks we're done
-            if ledger.all_complete() {
-                break;
             }
         }
 
@@ -296,14 +288,11 @@ mod tests {
         ledger.add_task("task2".to_string());
 
         assert_eq!(ledger.pending_tasks().len(), 2);
-        assert!(!ledger.all_complete());
 
         ledger.complete_task("task1");
         assert_eq!(ledger.pending_tasks().len(), 1);
-        assert!(!ledger.all_complete());
 
         ledger.complete_task("task2");
         assert_eq!(ledger.pending_tasks().len(), 0);
-        assert!(ledger.all_complete());
     }
 }

@@ -104,24 +104,40 @@ impl PatternExecutor for ConcurrentExecutor {
             agents.len()
         ));
 
-        // Launch all agents in parallel
-        let futures: Vec<_> = agents
-            .iter()
-            .map(|agent| {
-                let agent_id = agent.id().to_string();
-                let input = input.to_string();
-                async move {
-                    tracing::debug!(agent_id = %agent_id, "Concurrent: prompting agent");
-                    let result = agent.prompt(&input).await;
-                    (agent_id, result)
-                }
-            })
-            .collect();
+        // Launch all agents in parallel using real threads (not just cooperative async)
+        let mut tasks = Vec::new();
+        for agent in agents.iter() {
+            let agent_clone = agent.clone();
+            let input_clone = input.to_string();
+            let agent_id = agent.id().to_string();
 
-        metadata.add_trace(format!("Launched {} concurrent tasks", futures.len()));
+            tracing::debug!(agent_id = %agent_id, "Concurrent: spawning thread for agent");
+
+            // Use std::thread for true parallel execution
+            tasks.push(std::thread::spawn(move || {
+                // Create a tokio runtime in this thread for the async agent call
+                let rt = tokio::runtime::Runtime::new()
+                    .map_err(|e| anyhow::anyhow!("Failed to create runtime: {}", e))?;
+
+                let result = rt.block_on(async {
+                    agent_clone.prompt(&input_clone).await
+                });
+
+                Ok::<(String, anyhow::Result<String>), anyhow::Error>((agent_id, result))
+            }));
+        }
+
+        metadata.add_trace(format!("Launched {} concurrent threads", tasks.len()));
 
         // Wait for all results
-        let results = futures::future::join_all(futures).await;
+        let mut results = Vec::new();
+        for task in tasks {
+            match task.join() {
+                Ok(Ok((agent_id, result))) => results.push((agent_id, result)),
+                Ok(Err(e)) => return Err(e),
+                Err(_) => return Err(anyhow::anyhow!("Thread panicked")),
+            }
+        }
 
         // Separate successful and failed results
         let mut successes = Vec::new();
