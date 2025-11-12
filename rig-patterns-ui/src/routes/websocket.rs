@@ -136,7 +136,7 @@ async fn execute_all_patterns(
     let patterns = vec![
         ("sequential", PatternConfig::Sequential),
         ("concurrent", PatternConfig::Concurrent { aggregation: Aggregation::Combine }),
-        ("group_chat", PatternConfig::GroupChat { max_rounds: 3 }),
+        ("group_chat", PatternConfig::GroupChat { max_rounds: 3, resolution: rig_patterns::ResolutionStrategy::Consensus }),
         ("handoff", PatternConfig::Handoff { max_hops: 5 }),
         ("magentic", PatternConfig::Magentic { max_iterations: 5 }),
     ];
@@ -410,7 +410,7 @@ where
             }).await?;
         }
 
-        PatternConfig::GroupChat { max_rounds } => {
+        PatternConfig::GroupChat { max_rounds, .. } => {
             tracing::info!("[{}] Starting GROUP_CHAT pattern with {} agents (parallel within rounds)", pattern_id, agents.len());
             let rounds = *max_rounds;
 

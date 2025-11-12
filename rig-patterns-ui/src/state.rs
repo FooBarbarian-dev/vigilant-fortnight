@@ -1,6 +1,6 @@
 //! Shared application state and models
 
-use rig_patterns::{Aggregation, Pattern};
+use rig_patterns::{Aggregation, Pattern, ResolutionStrategy};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -20,7 +20,11 @@ pub struct AgentConfig {
 pub enum PatternConfig {
     Sequential,
     Concurrent { aggregation: Aggregation },
-    GroupChat { max_rounds: usize },
+    GroupChat {
+        max_rounds: usize,
+        #[serde(default)]
+        resolution: ResolutionStrategy
+    },
     Handoff { max_hops: usize },
     Magentic { max_iterations: usize },
 }
@@ -30,7 +34,7 @@ impl From<PatternConfig> for Pattern {
         match config {
             PatternConfig::Sequential => Pattern::Sequential,
             PatternConfig::Concurrent { aggregation } => Pattern::Concurrent { aggregation },
-            PatternConfig::GroupChat { max_rounds } => Pattern::GroupChat { max_rounds },
+            PatternConfig::GroupChat { max_rounds, resolution } => Pattern::GroupChat { max_rounds, resolution },
             PatternConfig::Handoff { max_hops } => Pattern::Handoff { max_hops },
             PatternConfig::Magentic { max_iterations } => Pattern::Magentic { max_iterations },
         }
@@ -318,7 +322,7 @@ impl AppState {
                         system_prompt: "You verify accuracy and suggest improvements.".to_string(),
                     },
                 ],
-                pattern: PatternConfig::GroupChat { max_rounds: 4 },
+                pattern: PatternConfig::GroupChat { max_rounds: 4, resolution: rig_patterns::ResolutionStrategy::Consensus },
                 sample_input: "Write a blog post about Rust async programming.".to_string(),
             },
         ]

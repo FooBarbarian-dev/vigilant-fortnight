@@ -122,7 +122,7 @@ fn create_mock_execution_result(
             (output, trace, metadata)
         }
 
-        PatternConfig::GroupChat { max_rounds } => {
+        PatternConfig::GroupChat { max_rounds, .. } => {
             let mut trace = vec![format!(
                 "Starting group chat with {} agents, max {} rounds",
                 agents.len(),

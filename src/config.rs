@@ -100,7 +100,7 @@ impl OrchestratorConfig {
             Pattern::Concurrent { .. } => {
                 // No special requirements
             }
-            Pattern::GroupChat { max_rounds } => {
+            Pattern::GroupChat { max_rounds, .. } => {
                 if *max_rounds == 0 {
                     anyhow::bail!("GroupChat pattern requires max_rounds > 0");
                 }

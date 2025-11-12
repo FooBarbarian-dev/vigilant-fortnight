@@ -149,7 +149,7 @@ impl PatternExecutor for MagenticExecutor {
 
         metadata.add_detail("tasks_created", tasks.len().to_string());
 
-        // Step 2: Execute tasks in parallel batches using threads
+        // Step 2: Execute tasks in parallel using tokio::spawn (thread pool)
         // Process all tasks at once if we have enough workers, otherwise batch them
         let pending = ledger.pending_tasks();
         let tasks_to_process: Vec<String> = pending.iter()
@@ -157,48 +157,38 @@ impl PatternExecutor for MagenticExecutor {
             .map(|s| s.to_string())
             .collect();
 
-        metadata.add_trace(format!("Processing {} tasks in parallel with threads", tasks_to_process.len()));
+        metadata.add_trace(format!("Processing {} tasks in parallel on thread pool", tasks_to_process.len()));
 
         if !tasks_to_process.is_empty() && !workers.is_empty() {
-            // Spawn threads for all tasks
-            let mut thread_handles = Vec::new();
+            // Spawn tasks for all workers on the thread pool
+            let mut task_handles = Vec::new();
 
             for (idx, task) in tasks_to_process.iter().enumerate() {
                 let task_clone = task.clone();
                 let worker = workers[idx % workers.len()].clone();
                 let worker_id = worker.id().to_string();
 
-                metadata.add_trace(format!("Spawning thread for task: {} -> worker: {}", task, worker_id));
+                metadata.add_trace(format!("Spawning task: {} -> worker: {}", task, worker_id));
 
-                let handle = std::thread::spawn(move || {
+                let handle = tokio::spawn(async move {
                     tracing::debug!(
                         task = %task_clone,
                         worker_id = %worker_id,
-                        "Magentic: worker executing task in thread"
+                        "Magentic: worker executing task on thread pool"
                     );
 
-                    // Create a tokio runtime in this thread for the async agent call
-                    let rt = tokio::runtime::Runtime::new()
-                        .map_err(|e| anyhow::anyhow!("Failed to create runtime: {}", e))?;
+                    let result = worker.prompt(&task_clone).await;
 
-                    let result = rt.block_on(async {
-                        worker.prompt(&task_clone).await
-                    });
-
-                    Ok::<(String, String, anyhow::Result<String>), anyhow::Error>((
-                        task_clone,
-                        worker_id,
-                        result
-                    ))
+                    (task_clone, worker_id, result)
                 });
 
-                thread_handles.push(handle);
+                task_handles.push(handle);
             }
 
-            // Collect results from all threads
-            for handle in thread_handles {
-                match handle.join() {
-                    Ok(Ok((task, worker_id, Ok(result)))) => {
+            // Collect results from all tasks
+            for handle in task_handles {
+                match handle.await {
+                    Ok((task, worker_id, Ok(result))) => {
                         metadata.add_trace(format!(
                             "Worker '{}' completed task '{}' ({} chars)",
                             worker_id,
@@ -208,15 +198,12 @@ impl PatternExecutor for MagenticExecutor {
                         task_results.push((task.clone(), result));
                         ledger.complete_task(&task);
                     }
-                    Ok(Ok((task, worker_id, Err(e)))) => {
+                    Ok((task, worker_id, Err(e))) => {
                         metadata.add_trace(format!("Worker '{}' failed on task '{}': {}", worker_id, task, e));
                         // Continue with other tasks
                     }
-                    Ok(Err(e)) => {
-                        metadata.add_trace(format!("Thread setup error: {}", e));
-                    }
-                    Err(_) => {
-                        metadata.add_trace("Thread panicked".to_string());
+                    Err(e) => {
+                        metadata.add_trace(format!("Task join error: {}", e));
                     }
                 }
             }

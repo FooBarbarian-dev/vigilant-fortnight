@@ -23,6 +23,27 @@ pub enum Aggregation {
     Combine,
 }
 
+/// Resolution strategy for group chat pattern
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "yaml", derive(serde::Deserialize, serde::Serialize))]
+#[cfg_attr(feature = "yaml", serde(rename_all = "lowercase"))]
+pub enum ResolutionStrategy {
+    /// Wait for explicit consensus signal from any agent
+    Consensus,
+    /// Stop when first agent signals completion
+    FirstToComplete,
+    /// Always run all rounds regardless of consensus
+    AllRounds,
+    /// Stop when majority of agents signal consensus
+    Majority,
+}
+
+impl Default for ResolutionStrategy {
+    fn default() -> Self {
+        Self::Consensus
+    }
+}
+
 /// Available orchestration patterns
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "yaml", derive(serde::Deserialize, serde::Serialize))]
@@ -41,6 +62,8 @@ pub enum Pattern {
     GroupChat {
         /// Maximum number of conversation rounds
         max_rounds: usize,
+        /// How to determine when the discussion is resolved
+        resolution: ResolutionStrategy,
     },
 
     /// Explicit task handoff between agents
@@ -110,8 +133,8 @@ pub(crate) fn create_executor(pattern: Pattern) -> Box<dyn PatternExecutor> {
         Pattern::Concurrent { aggregation } => {
             Box::new(concurrent::ConcurrentExecutor::new(aggregation))
         }
-        Pattern::GroupChat { max_rounds } => {
-            Box::new(group_chat::GroupChatExecutor::new(max_rounds))
+        Pattern::GroupChat { max_rounds, resolution } => {
+            Box::new(group_chat::GroupChatExecutor::new(max_rounds, resolution))
         }
         Pattern::Handoff { max_hops } => Box::new(handoff::HandoffExecutor::new(max_hops)),
         Pattern::Magentic { max_iterations } => {

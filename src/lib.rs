@@ -45,7 +45,7 @@ pub mod config;
 
 pub use agent::Agent;
 pub use orchestrator::{Orchestrator, OrchestratorBuilder};
-pub use patterns::{Aggregation, Pattern, PatternMetadata};
+pub use patterns::{Aggregation, Pattern, PatternMetadata, ResolutionStrategy};
 
 /// Result type for orchestration execution
 #[derive(Debug, Clone)]

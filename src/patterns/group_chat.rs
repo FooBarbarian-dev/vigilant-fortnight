@@ -1,20 +1,21 @@
 //! Group chat pattern: agents converse in rounds until consensus or max rounds
 
-use super::{PatternExecutor, PatternMetadata};
+use super::{PatternExecutor, PatternMetadata, ResolutionStrategy};
 use crate::{Agent, OrchestratorResult};
 use async_trait::async_trait;
 
 /// Group chat pattern executor
 ///
 /// Agents converse in rounds, building on each other's messages.
-/// Stops when a consensus keyword is detected or max rounds are reached.
+/// Stops based on the resolution strategy (consensus, first complete, all rounds, or majority).
 pub(crate) struct GroupChatExecutor {
     max_rounds: usize,
+    resolution: ResolutionStrategy,
 }
 
 impl GroupChatExecutor {
-    pub fn new(max_rounds: usize) -> Self {
-        Self { max_rounds }
+    pub fn new(max_rounds: usize, resolution: ResolutionStrategy) -> Self {
+        Self { max_rounds, resolution }
     }
 
     /// Check if the message indicates consensus has been reached
@@ -49,14 +50,16 @@ impl PatternExecutor for GroupChatExecutor {
         metadata.add_detail("pattern", "group_chat");
         metadata.add_detail("agent_count", agents.len().to_string());
         metadata.add_detail("max_rounds", self.max_rounds.to_string());
+        metadata.add_detail("resolution", format!("{:?}", self.resolution));
         metadata.add_trace(format!(
-            "Starting group chat with {} agents, max {} rounds",
+            "Starting group chat with {} agents, max {} rounds, resolution: {:?}",
             agents.len(),
-            self.max_rounds
+            self.max_rounds,
+            self.resolution
         ));
 
         let mut conversation_history: Vec<(String, String)> = Vec::new();
-        let mut consensus_reached = false;
+        let mut consensus_count = 0;
 
         for round in 0..self.max_rounds {
             metadata.add_trace(format!("--- Round {} (parallel execution) ---", round + 1));
@@ -125,28 +128,41 @@ impl PatternExecutor for GroupChatExecutor {
 
                 conversation_history.push((agent_id.clone(), response.clone()));
 
-                // Check for consensus
+                // Check for consensus/completion signals
                 if Self::check_consensus(&response) {
+                    consensus_count += 1;
                     metadata.add_trace(format!(
-                        "Consensus detected from agent '{}' in round {}",
+                        "Consensus signal from agent '{}' in round {} (total: {}/{})",
                         agent_id,
-                        round + 1
+                        round + 1,
+                        consensus_count,
+                        agents.len()
                     ));
-                    consensus_reached = true;
                 }
             }
 
-            if consensus_reached {
+            // Check resolution strategy
+            let should_stop = match self.resolution {
+                ResolutionStrategy::Consensus => consensus_count > 0,
+                ResolutionStrategy::FirstToComplete => consensus_count > 0,
+                ResolutionStrategy::AllRounds => false, // Never stop early
+                ResolutionStrategy::Majority => consensus_count > agents.len() / 2,
+            };
+
+            if should_stop && round + 1 < self.max_rounds {
+                metadata.add_trace(format!(
+                    "Stopping early due to {:?} resolution strategy",
+                    self.resolution
+                ));
                 break;
             }
+
+            // Reset consensus count for next round (for strategies that check per-round)
+            consensus_count = 0;
         }
 
-        let rounds_completed = if consensus_reached {
-            // Calculate which round we stopped in
-            ((conversation_history.len() - 1) / agents.len()) + 1
-        } else {
-            self.max_rounds
-        };
+        let rounds_completed = ((conversation_history.len() - 1) / agents.len()).max(0) + 1;
+        let consensus_reached = consensus_count > 0;
 
         metadata.add_detail("rounds_completed", rounds_completed.to_string());
         metadata.add_detail("consensus_reached", consensus_reached.to_string());
@@ -200,7 +216,7 @@ mod tests {
 
     #[test]
     fn test_group_chat_requires_agents() {
-        let executor = GroupChatExecutor::new(3);
+        let executor = GroupChatExecutor::new(3, ResolutionStrategy::Consensus);
         let rt = tokio::runtime::Runtime::new().unwrap();
 
         let result = rt.block_on(executor.execute(&[], "test input"));
@@ -210,7 +226,7 @@ mod tests {
 
     #[test]
     fn test_group_chat_requires_max_rounds() {
-        let executor = GroupChatExecutor::new(0);
+        let executor = GroupChatExecutor::new(0, ResolutionStrategy::Consensus);
         let rt = tokio::runtime::Runtime::new().unwrap();
 
         // Even with a mock agent, should fail validation

@@ -41,7 +41,7 @@ pub async fn compare_patterns(
         ),
         (
             "Group Chat",
-            PatternConfig::GroupChat { max_rounds: 3 },
+            PatternConfig::GroupChat { max_rounds: 3, resolution: rig_patterns::ResolutionStrategy::Consensus },
         ),
         ("Handoff", PatternConfig::Handoff { max_hops: 5 }),
         (

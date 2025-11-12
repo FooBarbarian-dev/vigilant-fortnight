@@ -104,38 +104,32 @@ impl PatternExecutor for ConcurrentExecutor {
             agents.len()
         ));
 
-        // Launch all agents in parallel using real threads (not just cooperative async)
+        // Launch all agents in parallel using tokio::spawn (uses thread pool)
         let mut tasks = Vec::new();
         for agent in agents.iter() {
             let agent_clone = agent.clone();
             let input_clone = input.to_string();
             let agent_id = agent.id().to_string();
 
-            tracing::debug!(agent_id = %agent_id, "Concurrent: spawning thread for agent");
+            tracing::debug!(agent_id = %agent_id, "Concurrent: spawning task on thread pool");
 
-            // Use std::thread for true parallel execution
-            tasks.push(std::thread::spawn(move || {
-                // Create a tokio runtime in this thread for the async agent call
-                let rt = tokio::runtime::Runtime::new()
-                    .map_err(|e| anyhow::anyhow!("Failed to create runtime: {}", e))?;
-
-                let result = rt.block_on(async {
-                    agent_clone.prompt(&input_clone).await
-                });
-
-                Ok::<(String, anyhow::Result<String>), anyhow::Error>((agent_id, result))
-            }));
+            // Use tokio::spawn for true parallel execution on the thread pool
+            let task = tokio::spawn(async move {
+                tracing::debug!(agent_id = %agent_id, "Concurrent: prompting agent");
+                let result = agent_clone.prompt(&input_clone).await;
+                (agent_id, result)
+            });
+            tasks.push(task);
         }
 
-        metadata.add_trace(format!("Launched {} concurrent threads", tasks.len()));
+        metadata.add_trace(format!("Launched {} concurrent tasks on thread pool", tasks.len()));
 
         // Wait for all results
         let mut results = Vec::new();
         for task in tasks {
-            match task.join() {
-                Ok(Ok((agent_id, result))) => results.push((agent_id, result)),
-                Ok(Err(e)) => return Err(e),
-                Err(_) => return Err(anyhow::anyhow!("Thread panicked")),
+            match task.await {
+                Ok((agent_id, result)) => results.push((agent_id, result)),
+                Err(e) => return Err(anyhow::anyhow!("Task join error: {}", e)),
             }
         }
 
