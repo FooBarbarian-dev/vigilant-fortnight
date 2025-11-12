@@ -115,6 +115,7 @@ async fn execute_all_patterns(
     request: CompareRequest,
 ) -> anyhow::Result<()> {
     tracing::info!("🚀 EXECUTING ALL PATTERNS IN PARALLEL");
+    tracing::info!("📊 Request input length: {} chars", request.input.len());
 
     // Get default agents if not provided per-pattern
     let default_agents = vec![
@@ -147,6 +148,7 @@ async fn execute_all_patterns(
     // Spawn tasks for each pattern
     let mut tasks = Vec::new();
     for (pattern_id, pattern_config) in patterns {
+        tracing::info!("📦 Preparing to spawn pattern: {}", pattern_id);
         let tx = tx.clone();
         let input = request.input.clone();
         let agents = request.pattern_configs
@@ -155,11 +157,13 @@ async fn execute_all_patterns(
             .map(|config| config.agents.clone())
             .unwrap_or_else(|| default_agents.clone());
 
+        tracing::info!("   └─ Pattern: {} has {} agents", pattern_id, agents.len());
+
         let pattern_id = pattern_id.to_string();
         let task = tokio::spawn(async move {
-            tracing::info!("[{}] Starting pattern execution", pattern_id);
+            tracing::info!("✅ [{}] Pattern task STARTED", pattern_id);
             if let Err(e) = execute_pattern_to_channel(tx.clone(), pattern_id.clone(), agents, pattern_config, input).await {
-                tracing::error!("[{}] Pattern execution failed: {}", pattern_id, e);
+                tracing::error!("❌ [{}] Pattern execution failed: {}", pattern_id, e);
                 // Send error event so the frontend doesn't hang waiting for completion
                 let _ = tx.send(ExecutionEvent::PatternError {
                     pattern_id: pattern_id.clone(),
@@ -167,24 +171,43 @@ async fn execute_all_patterns(
                     timestamp: chrono::Utc::now().to_rfc3339(),
                 });
             }
+            tracing::info!("🏁 [{}] Pattern task COMPLETED", pattern_id);
         });
         tasks.push(task);
+        tracing::info!("✓ Spawned task for pattern: {}", pattern_id);
     }
+
+    tracing::info!("📋 Total spawned tasks: {}", tasks.len());
 
     // Drop the original sender so the channel closes when all tasks complete
     drop(tx);
+    tracing::info!("🔒 Dropped original sender - channel will close when all patterns complete");
 
     // Forward all events from the channel to the WebSocket
+    tracing::info!("📡 Starting to forward events from channel to WebSocket...");
+    let mut event_count = 0;
     while let Some(event) = rx.recv().await {
+        event_count += 1;
+        tracing::debug!("📨 Event #{}: {:?}", event_count, match &event {
+            ExecutionEvent::PatternComplete { pattern_id, .. } => format!("PatternComplete({})", pattern_id),
+            ExecutionEvent::PatternError { pattern_id, .. } => format!("PatternError({})", pattern_id),
+            ExecutionEvent::AgentResponds { pattern_id, agent_id, .. } => format!("AgentResponds({}/{})", pattern_id, agent_id),
+            _ => "Other".to_string(),
+        });
         send_event(sender, event).await?;
     }
+    tracing::info!("📭 Channel closed. Forwarded {} events total", event_count);
 
     // Wait for all tasks to complete
-    for task in tasks {
-        let _ = task.await;
+    tracing::info!("⏳ Waiting for all {} pattern tasks to join...", tasks.len());
+    for (idx, task) in tasks.into_iter().enumerate() {
+        match task.await {
+            Ok(_) => tracing::info!("✅ Task {} joined successfully", idx + 1),
+            Err(e) => tracing::error!("❌ Task {} join error: {}", idx + 1, e),
+        }
     }
 
-    tracing::info!("All patterns completed");
+    tracing::info!("🎉 All patterns completed");
     Ok(())
 }
 
@@ -254,17 +277,20 @@ async fn execute_pattern_impl<S>(
 where
     S: EventSender,
 {
+    tracing::info!("🎯 [{}] execute_pattern_impl STARTING - pattern type: {:?}", pattern_id, pattern);
     tracing::info!("[{}] 🚀 REAL EXECUTION - Making actual LLM API calls", pattern_id);
 
     // Create real agents from the config
+    tracing::info!("[{}] Creating {} agents from config...", pattern_id, agents_config.len());
     let agents: Vec<Agent> = agents_config
         .iter()
         .map(|cfg| {
+            tracing::debug!("[{}]   Creating agent: {} ({})", pattern_id, cfg.id, cfg.provider);
             Agent::from_env(&cfg.id, &cfg.provider, &cfg.model, &cfg.system_prompt)
         })
         .collect::<anyhow::Result<Vec<_>>>()?;
 
-    tracing::info!("[{}] Created {} agents successfully", pattern_id, agents.len());
+    tracing::info!("[{}] ✅ Created {} agents successfully", pattern_id, agents.len());
 
     // Helper to get provider for an agent ID
     let get_provider = |agent_id: &str| -> String {
@@ -331,9 +357,10 @@ where
         }
 
         PatternConfig::Concurrent { aggregation } => {
-            tracing::info!("[{}] Starting CONCURRENT pattern with {} agents", pattern_id, agents.len());
+            tracing::info!("[{}] ▶▶▶ Starting CONCURRENT pattern with {} agents", pattern_id, agents.len());
 
             // All agents receive the same input
+            tracing::debug!("[{}] Sending input to {} agents...", pattern_id, agents.len());
             for agent in &agents {
                 let agent_id = agent.id();
                 let provider = get_provider(agent_id);
@@ -347,6 +374,7 @@ where
             }
 
             // All thinking concurrently
+            tracing::debug!("[{}] Sending thinking events...", pattern_id);
             for agent in &agents {
                 let agent_id = agent.id();
                 let provider = get_provider(agent_id);
@@ -359,23 +387,31 @@ where
             }
 
             // *** REAL CONCURRENT LLM CALLS WITH TIMEOUT ***
+            tracing::info!("[{}] 🔀 Spawning {} concurrent agent tasks...", pattern_id, agents.len());
             let mut tasks = Vec::new();
             for agent in &agents {
                 let input_clone = input.clone();
                 let agent_clone = agent.clone();
                 let agent_id = agent.id().to_string();
+                tracing::debug!("[{}]   Spawning task for agent: {}", pattern_id, agent_id);
                 tasks.push(tokio::spawn(async move {
+                    tracing::debug!("[{}][{}] Agent task started", pattern_id, agent_id);
                     let response = call_agent_with_timeout(&agent_clone, &input_clone, &agent_id).await?;
+                    tracing::debug!("[{}][{}] Agent task completed", pattern_id, agent_id);
                     Ok::<(String, String), anyhow::Error>((agent_clone.id().to_string(), response))
                 }));
             }
+            tracing::info!("[{}] ✅ Spawned {} agent tasks", pattern_id, tasks.len());
 
             // Wait for all responses - collect both successes and failures
+            tracing::info!("[{}] ⏳ Waiting for all {} agent tasks to complete...", pattern_id, tasks.len());
             let mut responses = Vec::new();
             let mut had_errors = false;
-            for task in tasks {
+            for (idx, task) in tasks.into_iter().enumerate() {
+                tracing::debug!("[{}] Awaiting task {}/{}...", pattern_id, idx + 1, agents.len());
                 match task.await {
                     Ok(Ok((agent_id, response))) => {
+                        tracing::info!("[{}] ✅ Agent {} completed successfully ({} chars)", pattern_id, agent_id, response.len());
                         let provider = get_provider(&agent_id);
 
                         sender.send(ExecutionEvent::AgentResponds {
@@ -389,26 +425,29 @@ where
                         responses.push(response);
                     }
                     Ok(Err(e)) => {
-                        tracing::error!("[{}] Agent task failed: {}", pattern_id, e);
+                        tracing::error!("[{}] ❌ Agent task failed: {}", pattern_id, e);
                         had_errors = true;
                     }
                     Err(e) => {
-                        tracing::error!("[{}] Agent task panicked: {}", pattern_id, e);
+                        tracing::error!("[{}] ❌ Agent task panicked: {}", pattern_id, e);
                         had_errors = true;
                     }
                 }
             }
+            tracing::info!("[{}] 📊 Collected {} successful responses", pattern_id, responses.len());
 
             // If all agents failed, return error
             if responses.is_empty() {
+                tracing::error!("[{}] ❌ ALL agents failed", pattern_id);
                 return Err(anyhow::anyhow!("All agents failed in concurrent pattern"));
             }
 
             // Log if there were partial failures
             if had_errors {
-                tracing::warn!("[{}] Concurrent pattern completed with {} successes and some failures", pattern_id, responses.len());
+                tracing::warn!("[{}] ⚠️ Concurrent pattern completed with {} successes and some failures", pattern_id, responses.len());
             }
 
+            tracing::info!("[{}] 📦 Aggregating results...", pattern_id);
             sender.send(ExecutionEvent::PatternStep {
                 pattern_id: pattern_id.clone(),
                 message: format!("Aggregating {} results using {:?} strategy...", responses.len(), aggregation),
@@ -418,7 +457,7 @@ where
             // Simple aggregation
             let aggregated = responses.join("\n\n---\n\n");
 
-            tracing::info!("[{}] Concurrent pattern completed", pattern_id);
+            tracing::info!("[{}] ✅ Concurrent pattern completed successfully", pattern_id);
 
             sender.send(ExecutionEvent::PatternComplete {
                 pattern_id: pattern_id.clone(),
@@ -430,6 +469,7 @@ where
                 }),
                 timestamp: chrono::Utc::now().to_rfc3339(),
             }).await?;
+            tracing::info!("[{}] 📤 Sent PatternComplete event", pattern_id);
         }
 
         PatternConfig::GroupChat { max_rounds, .. } => {
