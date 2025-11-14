@@ -145,6 +145,10 @@ async fn execute_all_patterns(
     // Create channels for each pattern to send events
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<ExecutionEvent>();
 
+    // Semaphore to limit concurrent pattern execution (only 2 at a time to avoid API rate limits)
+    let semaphore = Arc::new(tokio::sync::Semaphore::new(2));
+    tracing::info!("🚦 Using semaphore to limit to 2 concurrent patterns (prevents API rate limiting)");
+
     // Spawn tasks for each pattern
     let mut tasks = Vec::new();
     for (pattern_id, pattern_config) in patterns {
@@ -161,8 +165,13 @@ async fn execute_all_patterns(
 
         let pattern_id_str = pattern_id.to_string();
         let pattern_id_clone = pattern_id_str.clone();
+        let semaphore_clone = semaphore.clone();
+
         let task = tokio::spawn(async move {
-            tracing::info!("✅ [{}] Pattern task STARTED", pattern_id_clone);
+            // Acquire semaphore permit (blocks if 2 patterns already running)
+            let _permit = semaphore_clone.acquire().await.unwrap();
+            tracing::info!("✅ [{}] Pattern task STARTED (acquired semaphore permit)", pattern_id_clone);
+
             if let Err(e) = execute_pattern_to_channel(tx.clone(), pattern_id_clone.clone(), agents, pattern_config, input).await {
                 tracing::error!("❌ [{}] Pattern execution failed: {}", pattern_id_clone, e);
                 // Send error event so the frontend doesn't hang waiting for completion
@@ -172,7 +181,8 @@ async fn execute_all_patterns(
                     timestamp: chrono::Utc::now().to_rfc3339(),
                 });
             }
-            tracing::info!("🏁 [{}] Pattern task COMPLETED", pattern_id_clone);
+            tracing::info!("🏁 [{}] Pattern task COMPLETED (releasing semaphore permit)", pattern_id_clone);
+            // Permit is automatically released when _permit is dropped
         });
         tasks.push(task);
         tracing::info!("✓ Spawned task for pattern: {}", pattern_id_str);
@@ -255,8 +265,8 @@ async fn execute_single_pattern(
     execute_pattern_impl(&mut ws_sender, pattern_id, agents_config, pattern, input).await
 }
 
-/// Timeout duration for agent LLM calls (60 seconds)
-const AGENT_TIMEOUT: Duration = Duration::from_secs(60);
+/// Timeout duration for agent LLM calls (180 seconds to handle slow responses and rate limits)
+const AGENT_TIMEOUT: Duration = Duration::from_secs(180);
 
 /// Helper function to call an agent with timeout
 async fn call_agent_with_timeout(agent: &Agent, prompt: &str, agent_id: &str) -> anyhow::Result<String> {
