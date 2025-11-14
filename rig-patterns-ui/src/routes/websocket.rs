@@ -159,22 +159,23 @@ async fn execute_all_patterns(
 
         tracing::info!("   └─ Pattern: {} has {} agents", pattern_id, agents.len());
 
-        let pattern_id = pattern_id.to_string();
+        let pattern_id_str = pattern_id.to_string();
+        let pattern_id_clone = pattern_id_str.clone();
         let task = tokio::spawn(async move {
-            tracing::info!("✅ [{}] Pattern task STARTED", pattern_id);
-            if let Err(e) = execute_pattern_to_channel(tx.clone(), pattern_id.clone(), agents, pattern_config, input).await {
-                tracing::error!("❌ [{}] Pattern execution failed: {}", pattern_id, e);
+            tracing::info!("✅ [{}] Pattern task STARTED", pattern_id_clone);
+            if let Err(e) = execute_pattern_to_channel(tx.clone(), pattern_id_clone.clone(), agents, pattern_config, input).await {
+                tracing::error!("❌ [{}] Pattern execution failed: {}", pattern_id_clone, e);
                 // Send error event so the frontend doesn't hang waiting for completion
                 let _ = tx.send(ExecutionEvent::PatternError {
-                    pattern_id: pattern_id.clone(),
+                    pattern_id: pattern_id_clone.clone(),
                     error: e.to_string(),
                     timestamp: chrono::Utc::now().to_rfc3339(),
                 });
             }
-            tracing::info!("🏁 [{}] Pattern task COMPLETED", pattern_id);
+            tracing::info!("🏁 [{}] Pattern task COMPLETED", pattern_id_clone);
         });
         tasks.push(task);
-        tracing::info!("✓ Spawned task for pattern: {}", pattern_id);
+        tracing::info!("✓ Spawned task for pattern: {}", pattern_id_str);
     }
 
     tracing::info!("📋 Total spawned tasks: {}", tasks.len());
@@ -393,11 +394,12 @@ where
                 let input_clone = input.clone();
                 let agent_clone = agent.clone();
                 let agent_id = agent.id().to_string();
+                let pattern_id_clone = pattern_id.clone();
                 tracing::debug!("[{}]   Spawning task for agent: {}", pattern_id, agent_id);
                 tasks.push(tokio::spawn(async move {
-                    tracing::debug!("[{}][{}] Agent task started", pattern_id, agent_id);
+                    tracing::debug!("[{}][{}] Agent task started", pattern_id_clone, agent_id);
                     let response = call_agent_with_timeout(&agent_clone, &input_clone, &agent_id).await?;
-                    tracing::debug!("[{}][{}] Agent task completed", pattern_id, agent_id);
+                    tracing::debug!("[{}][{}] Agent task completed", pattern_id_clone, agent_id);
                     Ok::<(String, String), anyhow::Error>((agent_clone.id().to_string(), response))
                 }));
             }
